@@ -44,7 +44,7 @@ export function ResultsView({ onReset }: ResultsViewProps) {
     analysisResult, currentSchema,
     roastAnnotations, recruiterEvaluation, interviewPrep,
     resumeText, jdText, activePanel,
-    currentResumeText, resumeTextVersions,
+    currentResumeText, resumeTextVersions, resumeFileUrl,
     setActivePanel, setRoastAnnotations, setRecruiterEvaluation,
     setInterviewPrep, setChatMode,
   } = useResumeStore()
@@ -233,27 +233,37 @@ export function ResultsView({ onReset }: ResultsViewProps) {
           </div>
         )}
 
-        {/* Resume preview — shows original text as-is */}
+        {/* Resume preview */}
         {panel === 'resume' && (
-          <div className="flex-1 overflow-y-auto">
-            <div className="sticky top-0 bg-[var(--bg)] border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-10">
+          <div className="flex flex-col h-full">
+            <div className="flex-shrink-0 bg-[var(--bg)] border-b border-[var(--border)] px-4 py-3 flex items-center justify-between">
               <div>
                 <h1 className="text-sm font-semibold text-[var(--text)]">Resume Preview</h1>
-                {resumeTextVersions.length > 0 && (
-                  <p className="text-[11px] text-[var(--accent)]">
-                    v{resumeTextVersions.length + 1} · {resumeTextVersions[resumeTextVersions.length - 1]?.changeDescription}
-                  </p>
-                )}
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {resumeTextVersions.length > 0
+                    ? `v${resumeTextVersions.length + 1} — edited · ${resumeTextVersions[resumeTextVersions.length - 1]?.changeDescription}`
+                    : 'Original'}
+                </p>
               </div>
               <ResumeExporter schema={schema} resumeText={currentResumeText || resumeText} />
             </div>
-            <div className="p-6 max-w-3xl mx-auto">
-              <div className="bg-white rounded-lg border border-[var(--border)] shadow-xl p-8 md:p-12">
-                <pre className="whitespace-pre-wrap font-[inherit] text-[13px] text-gray-900 leading-relaxed">
-                  {currentResumeText || resumeText}
-                </pre>
+
+            {/* Show original PDF if no edits, otherwise show edited text */}
+            {resumeTextVersions.length === 0 && resumeFileUrl ? (
+              <iframe
+                src={resumeFileUrl}
+                className="flex-1 w-full border-0"
+                title="Resume PDF"
+              />
+            ) : (
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="bg-white rounded-lg border border-[var(--border)] shadow-xl p-8 md:p-12 max-w-3xl mx-auto">
+                  <pre className="whitespace-pre-wrap font-sans text-[13px] text-gray-900 leading-relaxed">
+                    {currentResumeText || resumeText}
+                  </pre>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

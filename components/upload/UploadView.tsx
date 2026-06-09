@@ -18,6 +18,7 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
     resumeText, jdText, isParsing,
     setResumeFile, setJdFile, setJdInput,
     setResumeText, setJdText, setIsParsing,
+    setResumeFileUrl,
   } = useResumeStore()
 
   const [jdMode, setJdMode] = useState<'paste' | 'upload'>('paste')
@@ -47,6 +48,9 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
 
   const handleResumeFile = async (file: File) => {
     setResumeFile(file)
+    // Create blob URL so we can show the original PDF in the preview tab
+    const url = URL.createObjectURL(file)
+    setResumeFileUrl(url)
     await parseFile(file, 'resume')
   }
 

@@ -60,6 +60,7 @@ export interface ResumeStore {
   resumeText: string
   jdText: string
   jdInput: string
+  resumeFileUrl: string   // blob URL for showing original PDF in preview
 
   // Resume versions
   resumeVersions: ResumeVersion[]
@@ -96,6 +97,7 @@ export interface ResumeStore {
 
   // Actions
   setResumeFile: (f: File | null) => void
+  setResumeFileUrl: (url: string) => void
   setJdFile: (f: File | null) => void
   setResumeText: (t: string) => void
   setJdText: (t: string) => void
@@ -129,6 +131,7 @@ const initial = {
   currentVersionId: null,
   currentResumeText: '',
   resumeTextVersions: [],
+  resumeFileUrl: '',
   isUploading: false,
   isParsing: false,
   isAnalyzing: false,
@@ -150,6 +153,7 @@ export const useResumeStore = create<ResumeStore>((set, get) => ({
   ...initial,
 
   setResumeFile: (f) => set({ resumeFile: f }),
+  setResumeFileUrl: (url) => set({ resumeFileUrl: url }),
   setJdFile: (f) => set({ jdFile: f }),
   setResumeText: (t) => set({ resumeText: t }),
   setJdText: (t) => set({ jdText: t }),
