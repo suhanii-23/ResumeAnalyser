@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ─────────────────────────────────── */
+:root {
+  --bg:        #0F0F10;
+  --bg-subtle: #141415;
+  --bg-raised: #1C1C1E;
+  --bg-overlay:#242426;
+  --border:    rgba(255,255,255,0.07);
+  --border-md: rgba(255,255,255,0.11);
+  --text:      #E4E4E7;
+  --text-muted:#8B8B94;
+  --text-faint:#52525B;
+  --accent:    #5E6AD2;
+  --accent-hover:#6D7AE0;
+  --accent-subtle: rgba(94,106,210,0.12);
+  --accent-border: rgba(94,106,210,0.3);
+  --green:     #16A34A;
+  --green-subtle: rgba(22,163,74,0.1);
+  --red:       #DC2626;
+  --red-subtle: rgba(220,38,38,0.1);
+  --amber:     #D97706;
+  --amber-subtle: rgba(217,119,6,0.1);
+}
+
+* { box-sizing: border-box; padding: 0; margin: 0; }
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--bg-overlay);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-md); }
+
+/* ─── Utilities ──────────────────────────────────────── */
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  .surface {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+  .surface-overlay {
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-md);
+  }
+  .accent-text { color: var(--accent); }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-md);
+    color: var(--text-muted);
+  }
+}
+
+/* ─── Resume renderer ────────────────────────────────── */
+.resume-document {
+  background: #fff;
+  color: #111827;
+  font-family: 'Georgia', serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  padding: 40px 48px;
+  min-height: 100%;
+}
+.resume-document h1 {
+  font-size: 20pt;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.resume-document .resume-contact {
+  font-size: 9.5pt;
+  color: #374151;
+  margin-bottom: 16px;
+}
+.resume-document .resume-section-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1.5px solid #111827;
+  padding-bottom: 2px;
+  margin: 14px 0 8px;
+}
+.resume-document .resume-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.resume-document .resume-entry-title {
+  font-weight: 700;
+  font-size: 10.5pt;
+}
+.resume-document .resume-entry-sub {
+  font-style: italic;
+  font-size: 10pt;
+  color: #374151;
+}
+.resume-document .resume-entry-date {
+  font-size: 9.5pt;
+  color: #6B7280;
+  white-space: nowrap;
+}
+.resume-document ul {
+  padding-left: 18px;
+  margin: 4px 0;
+}
+.resume-document ul li {
+  font-size: 10pt;
+  margin-bottom: 2px;
+}
+.resume-document .resume-skills-list {
+  font-size: 10pt;
+}
+.resume-document .resume-highlight {
+  background: rgba(255, 220, 50, 0.4);
+  border-radius: 2px;
+}
+.resume-document .resume-added {
+  background: rgba(22, 163, 74, 0.15);
+}
+.resume-document .resume-removed {
+  background: rgba(220, 38, 38, 0.12);
+  text-decoration: line-through;
+}
+
+/* ─── Chat markdown ──────────────────────────────────── */
+.md h1, .md h2, .md h3 { color: var(--text); margin: 12px 0 6px; font-weight: 600; }
+.md h2 { font-size: 13px; }
+.md h3 { font-size: 12px; color: var(--text-muted); }
+.md p { color: var(--text-muted); line-height: 1.65; margin-bottom: 8px; }
+.md ul, .md ol { padding-left: 18px; margin-bottom: 8px; }
+.md li { color: var(--text-muted); margin-bottom: 3px; line-height: 1.55; }
+.md li::marker { color: var(--accent); }
+.md code {
+  background: var(--bg-overlay);
+  color: #93C5FD;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.md pre {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+.md pre code { background: none; border: none; padding: 0; }
+.md strong { color: var(--text); font-weight: 600; }
+.md blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-faint);
+  font-style: italic;
+  margin: 8px 0;
+}
+.md hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ─── Diff viewer ────────────────────────────────────── */
+.diff-added { background: rgba(22,163,74,0.12); color: #4ADE80; }
+.diff-removed { background: rgba(220,38,38,0.12); color: #F87171; text-decoration: line-through; }
+.diff-changed { background: rgba(217,119,6,0.1); color: #FCD34D; }
+
+/* ─── Roast annotation ───────────────────────────────── */
+.roast-annotation {
+  position: relative;
+  cursor: pointer;
+}
+.roast-annotation .roast-underline {
+  border-bottom: 2px wavy #DC2626;
+}
+.roast-annotation .roast-tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 50;
+  background: #1C1C1E;
+  border: 1px solid rgba(220,38,38,0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 220px;
+  max-width: 320px;
+  font-size: 12px;
+  color: #E4E4E7;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  white-space: normal;
+}
+.roast-annotation:hover .roast-tooltip {
+  display: block;
+}

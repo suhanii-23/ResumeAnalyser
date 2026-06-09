@@ -1,0 +1,80 @@
+'use client'
+import * as React from 'react'
+import { cn } from '@/lib/utils'
+
+const TabsContext = React.createContext<{ value: string; onChange: (v: string) => void }>({
+  value: '',
+  onChange: () => {},
+})
+
+export function Tabs({
+  value,
+  onValueChange,
+  children,
+  className,
+}: {
+  value: string
+  onValueChange: (v: string) => void
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <TabsContext.Provider value={{ value, onChange: onValueChange }}>
+      <div className={className}>{children}</div>
+    </TabsContext.Provider>
+  )
+}
+
+export function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'inline-flex h-9 items-center gap-0.5 rounded-md bg-[var(--bg-overlay)] border border-[var(--border)] p-1',
+        className
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+export function TabsTrigger({
+  value,
+  children,
+  className,
+}: {
+  value: string
+  children: React.ReactNode
+  className?: string
+}) {
+  const ctx = React.useContext(TabsContext)
+  const active = ctx.value === value
+  return (
+    <button
+      onClick={() => ctx.onChange(value)}
+      className={cn(
+        'inline-flex items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors select-none',
+        active
+          ? 'bg-[var(--bg-raised)] text-[var(--text)] shadow-sm border border-[var(--border-md)]'
+          : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-raised)]/50',
+        className
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function TabsContent({
+  value,
+  children,
+  className,
+}: {
+  value: string
+  children: React.ReactNode
+  className?: string
+}) {
+  const ctx = React.useContext(TabsContext)
+  if (ctx.value !== value) return null
+  return <div className={cn('mt-3', className)}>{children}</div>
+}

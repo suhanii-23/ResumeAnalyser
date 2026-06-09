@@ -1,0 +1,52 @@
+{
+  "name": "resume-analyser",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.12",
+    "@radix-ui/react-dialog": "^1.1.16",
+    "@radix-ui/react-progress": "^1.1.9",
+    "@radix-ui/react-slot": "^1.2.5",
+    "@radix-ui/react-tabs": "^1.1.14",
+    "@radix-ui/react-tooltip": "^1.2.9",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/diff": "^7.0.2",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "diff": "^9.0.0",
+    "framer-motion": "^12.40.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.476.0",
+    "mammoth": "^1.12.0",
+    "next": "15.1.0",
+    "next-themes": "^0.4.6",
+    "openai": "^4.77.0",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-dropzone": "^14.3.8",
+    "react-markdown": "^9.0.3",
+    "react-syntax-highlighter": "^16.1.1",
+    "recharts": "^2.15.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/pdf-parse": "^1.1.5",
+    "autoprefixer": "^10.4.0"
+  }
+}
