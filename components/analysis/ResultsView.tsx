@@ -14,10 +14,10 @@ import { Suggestions } from './Suggestions'
 
 import { RecruiterView } from './RecruiterView'
 import { ChatInterface } from '@/components/chat/ChatInterface'
-import { ResumeRenderer } from '@/components/resume/ResumeRenderer'
 import { ResumeDiffViewer } from '@/components/resume/ResumeDiffViewer'
 import { FinalResume } from '@/components/resume/FinalResume'
 import { RoastAnnotations } from '@/components/resume/RoastAnnotations'
+import { RoastedResume } from '@/components/resume/RoastedResume'
 import { InterviewPrep } from '@/components/interview/InterviewPrep'
 import { ResumeExporter } from '@/components/resume/ResumeExporter'
 import { useResumeStore } from '@/lib/store'
@@ -265,58 +265,57 @@ export function ResultsView({ onReset }: ResultsViewProps) {
 
         {/* Roast */}
         {panel === 'roast' && (
-          <div className="flex h-full">
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
-                  <p className="text-xs text-[var(--text-muted)]">Line-by-line critique from a senior recruiter</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
+          <div className="flex-1 overflow-y-auto">
+            {roastAnnotations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="text-5xl mb-4">🔥</div>
+                <p className="text-sm font-semibold text-[var(--text)] mb-1">Resume Roast</p>
+                <p className="text-xs text-[var(--text-muted)] max-w-xs mb-6 leading-relaxed">
+                  Get your resume torn apart — red annotations directly on the document, every weak phrase called out with a fix.
+                </p>
+                <Button onClick={runRoast} disabled={!!loadingPanel} variant="outline">
                   {loadingPanel === 'roast'
-                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Roasting…</>
-                    : 'Re-Roast'
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Roasting…</>
+                    : '🔥 Roast My Resume'
                   }
                 </Button>
               </div>
-              {roastAnnotations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="text-4xl mb-3">🔥</div>
-                  <p className="text-sm text-[var(--text)] font-medium mb-1">Resume Roast</p>
-                  <p className="text-xs text-[var(--text-muted)] max-w-xs mb-6">
-                    Get line-by-line critique. Every vague bullet, missing metric, and weak phrasing called out — with specific fixes.
-                  </p>
-                  <Button onClick={runRoast} disabled={!!loadingPanel} variant="outline">
-                    {loadingPanel === 'roast'
-                      ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Analyzing…</>
-                      : '🔥 Roast My Resume'
-                    }
-                  </Button>
+            ) : (
+              <div className="flex gap-6 px-5 py-5 max-w-6xl">
+                {/* Left: annotated resume document */}
+                <div className="w-[480px] flex-shrink-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-[var(--text-muted)]">Annotated Resume</span>
+                    <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
+                      {loadingPanel === 'roast'
+                        ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Re-roasting…</>
+                        : '🔥 Re-Roast'
+                      }
+                    </Button>
+                  </div>
+                  <RoastedResume
+                    resumeText={currentResumeText || resumeText}
+                    annotations={roastAnnotations}
+                    overallVerdict={roastMeta.overallVerdict}
+                    funniesLine={roastMeta.funniesLine}
+                  />
                 </div>
-              ) : (
-                <RoastAnnotations
-                  annotations={roastAnnotations}
-                  schema={schema}
-                  overallVerdict={roastMeta.overallVerdict}
-                  funniesLine={roastMeta.funniesLine}
-                  biggestMissedOpportunity={roastMeta.biggestMissedOpportunity}
-                />
-              )}
-            </div>
-            {/* Resume with highlights */}
-            <div className="w-[380px] flex-shrink-0 border-l border-[var(--border)] overflow-y-auto">
-              <div className="px-3 py-3 border-b border-[var(--border)] sticky top-0 bg-[var(--bg)] z-10">
-                <span className="text-xs text-[var(--text-muted)]">Resume (with annotations)</span>
-              </div>
-              <div className="p-3">
-                <div className="rounded-lg border border-[var(--border)] overflow-hidden shadow-lg">
-                  <ResumeRenderer
+
+                {/* Right: structured breakdown */}
+                <div className="flex-1 min-w-0">
+                  <div className="mb-3">
+                    <span className="text-xs font-medium text-[var(--text-muted)]">Critique Breakdown</span>
+                  </div>
+                  <RoastAnnotations
+                    annotations={roastAnnotations}
                     schema={schema}
-                    highlights={roastAnnotations.map((a) => a.targetText)}
+                    overallVerdict={roastMeta.overallVerdict}
+                    funniesLine={roastMeta.funniesLine}
+                    biggestMissedOpportunity={roastMeta.biggestMissedOpportunity}
                   />
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
