@@ -34,13 +34,12 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
       const data = await res.json()
       if (data.text) {
         type === 'resume' ? setResumeText(data.text) : setJdText(data.text)
+        setParseError('')
       } else {
-        setParseError(data.error || 'Could not read file. Please paste the text directly below.')
-        if (type === 'resume') setResumeFile(null)
+        setParseError('Could not extract text from PDF. Please paste your resume text in the box below.')
       }
     } catch {
-      setParseError('Network error. Please paste the text directly.')
-      if (type === 'resume') setResumeFile(null)
+      setParseError('Network error parsing file. Please paste your resume text below.')
     } finally {
       setIsParsing(false)
     }
@@ -101,21 +100,17 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
               onRemove={() => { setResumeFile(null); setResumeText('') }}
             />
 
-            {!resumeFile && (
-              <>
-                <div className="flex items-center gap-3 my-3">
-                  <div className="h-px flex-1 bg-[var(--border)]" />
-                  <span className="text-[11px] text-[var(--text-faint)]">or paste text</span>
-                  <div className="h-px flex-1 bg-[var(--border)]" />
-                </div>
-                <Textarea
-                  placeholder="Paste resume text here…"
-                  value={resumeText}
-                  onChange={(e) => setResumeText(e.target.value)}
-                  className="h-28"
-                />
-              </>
-            )}
+            <div className="flex items-center gap-3 my-3">
+              <div className="h-px flex-1 bg-[var(--border)]" />
+              <span className="text-[11px] text-[var(--text-faint)]">{resumeFile ? 'or paste text as fallback' : 'or paste text'}</span>
+              <div className="h-px flex-1 bg-[var(--border)]" />
+            </div>
+            <Textarea
+              placeholder="Paste resume text here…"
+              value={resumeText}
+              onChange={(e) => setResumeText(e.target.value)}
+              className="h-28"
+            />
 
             {resumeText && resumeFile && (
               <>
