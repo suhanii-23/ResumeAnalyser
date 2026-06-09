@@ -62,10 +62,29 @@ export interface ResumeVersion {
 export interface RoastAnnotation {
   id: string
   section: string
-  targetText: string
+  targetText: string   // anchorText alias kept for compat
   comment: string
   severity: 'fatal' | 'error' | 'warning' | 'note'
-  suggestion?: string
+  suggestion?: string  // kept for compat
+  fix?: string         // new: exact replacement text
+}
+
+export interface RoastVerdict {
+  impressed: string[]
+  annoyed: string[]
+  interviewQuestions: string[]
+  shortlist: 'strong-yes' | 'yes' | 'maybe' | 'no' | 'strong-no'
+  shortlistExplanation: string
+}
+
+export interface RoastResult {
+  annotations: RoastAnnotation[]
+  roastScore: number
+  roastScoreMeaning: string
+  overallVerdict: string
+  funniesLine: string
+  biggestMissedOpportunity: string
+  verdict: RoastVerdict
 }
 
 export interface RecruiterEvaluation {

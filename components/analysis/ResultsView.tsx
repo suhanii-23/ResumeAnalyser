@@ -43,17 +43,14 @@ type Panel = typeof NAV_ITEMS[number]['id']
 export function ResultsView({ onReset }: ResultsViewProps) {
   const {
     analysisResult, currentSchema,
-    roastAnnotations, recruiterEvaluation, interviewPrep,
+    roastAnnotations, roastResult, recruiterEvaluation, interviewPrep,
     resumeText, jdText, activePanel,
     currentResumeText, resumeTextVersions, resumeFileUrl,
-    setActivePanel, setRoastAnnotations, setRecruiterEvaluation,
+    setActivePanel, setRoastAnnotations, setRoastResult, setRecruiterEvaluation,
     setInterviewPrep, setChatMode,
   } = useResumeStore()
 
   const [loadingPanel, setLoadingPanel] = useState<string | null>(null)
-  const [roastMeta, setRoastMeta] = useState<{
-    overallVerdict?: string; funniesLine?: string; biggestMissedOpportunity?: string
-  }>({})
 
   if (!analysisResult) return null
 
@@ -68,19 +65,15 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          resumeText,
-          resumeSchema: schema,
+          resumeText: currentResumeText || resumeText,
+          jdText,
           mode: 'roast',
         }),
       })
       const data = await res.json()
       if (data.result?.annotations) {
         setRoastAnnotations(data.result.annotations as RoastAnnotation[])
-        setRoastMeta({
-          overallVerdict: data.result.overallVerdict,
-          funniesLine: data.result.funniesLine,
-          biggestMissedOpportunity: data.result.biggestMissedOpportunity,
-        })
+        setRoastResult(data.result)
         setActivePanel('roast')
       }
     } finally {
@@ -271,7 +264,7 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                 <div className="text-5xl mb-4">🔥</div>
                 <p className="text-sm font-semibold text-[var(--text)] mb-1">Resume Roast</p>
                 <p className="text-xs text-[var(--text-muted)] max-w-xs mb-6 leading-relaxed">
-                  Get your resume torn apart — red annotations directly on the document, every weak phrase called out with a fix.
+                  A senior recruiter grabs a red pen and tears through your resume line by line. Every vague bullet, buzzword, and missed opportunity called out — with specific fixes.
                 </p>
                 <Button onClick={runRoast} disabled={!!loadingPanel} variant="outline">
                   {loadingPanel === 'roast'
@@ -281,39 +274,30 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                 </Button>
               </div>
             ) : (
-              <div className="flex gap-6 px-5 py-5 max-w-6xl">
-                {/* Left: annotated resume document */}
-                <div className="w-[480px] flex-shrink-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-[var(--text-muted)]">Annotated Resume</span>
-                    <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
-                      {loadingPanel === 'roast'
-                        ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Re-roasting…</>
-                        : '🔥 Re-Roast'
-                      }
-                    </Button>
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
+                    <p className="text-[11px] text-[var(--text-muted)]">Hover highlights · click margin notes for details</p>
                   </div>
-                  <RoastedResume
-                    resumeText={currentResumeText || resumeText}
-                    annotations={roastAnnotations}
-                    overallVerdict={roastMeta.overallVerdict}
-                    funniesLine={roastMeta.funniesLine}
-                  />
+                  <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
+                    {loadingPanel === 'roast'
+                      ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
+                      : '🔥 Re-Roast'
+                    }
+                  </Button>
                 </div>
-
-                {/* Right: structured breakdown */}
-                <div className="flex-1 min-w-0">
-                  <div className="mb-3">
-                    <span className="text-xs font-medium text-[var(--text-muted)]">Critique Breakdown</span>
-                  </div>
-                  <RoastAnnotations
-                    annotations={roastAnnotations}
-                    schema={schema}
-                    overallVerdict={roastMeta.overallVerdict}
-                    funniesLine={roastMeta.funniesLine}
-                    biggestMissedOpportunity={roastMeta.biggestMissedOpportunity}
-                  />
-                </div>
+                <RoastedResume
+                  resumeText={currentResumeText || resumeText}
+                  annotations={roastAnnotations}
+                  roastScore={roastResult?.roastScore}
+                  roastScoreMeaning={roastResult?.roastScoreMeaning}
+                  overallVerdict={roastResult?.overallVerdict}
+                  funniesLine={roastResult?.funniesLine}
+                  biggestMissedOpportunity={roastResult?.biggestMissedOpportunity}
+                  verdict={roastResult?.verdict}
+                  hasFile={!!resumeFileUrl}
+                />
               </div>
             )}
           </div>

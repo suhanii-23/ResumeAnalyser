@@ -18,13 +18,20 @@ export async function POST(req: NextRequest) {
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: ROAST_PROMPT(resumeText, resumeSchema || {}) },
+          { role: 'user', content: ROAST_PROMPT(resumeText, jdText || '') },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.85,
-        max_tokens: 3000,
+        temperature: 0.8,
+        max_tokens: 4000,
       })
       const result = JSON.parse(response.choices[0].message.content || '{}')
+      // Normalise anchorText → targetText for backwards compat
+      if (result.annotations) {
+        result.annotations = result.annotations.map((a: Record<string, string>) => ({
+          ...a,
+          targetText: a.anchorText || a.targetText || '',
+        }))
+      }
       return NextResponse.json({ result })
     }
 
