@@ -22,9 +22,11 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
 
   const [jdMode, setJdMode] = useState<'paste' | 'upload'>('paste')
   const [showPreview, setShowPreview] = useState(false)
+  const [parseError, setParseError] = useState('')
 
   const parseFile = async (file: File, type: 'resume' | 'jd') => {
     setIsParsing(true)
+    setParseError('')
     try {
       const fd = new FormData()
       fd.append('file', file)
@@ -32,7 +34,13 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
       const data = await res.json()
       if (data.text) {
         type === 'resume' ? setResumeText(data.text) : setJdText(data.text)
+      } else {
+        setParseError(data.error || 'Could not read file. Please paste the text directly below.')
+        if (type === 'resume') setResumeFile(null)
       }
+    } catch {
+      setParseError('Network error. Please paste the text directly.')
+      if (type === 'resume') setResumeFile(null)
     } finally {
       setIsParsing(false)
     }
@@ -195,7 +203,12 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
             )}
           </Button>
 
-          {!canAnalyze && (
+          {parseError && (
+            <p className="text-center text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+              {parseError}
+            </p>
+          )}
+          {!canAnalyze && !parseError && (
             <p className="text-center text-xs text-[var(--text-faint)]">
               Add both your resume and job description to continue
             </p>
