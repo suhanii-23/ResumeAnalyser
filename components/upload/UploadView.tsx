@@ -36,11 +36,14 @@ export function UploadView({ onAnalyze }: UploadViewProps) {
       if (data.text) {
         type === 'resume' ? setResumeText(data.text) : setJdText(data.text)
         setParseError('')
+      } else if (data.error === 'paste' || res.status === 422) {
+        // PDF parsed but returned no text — ask user to paste
+        setParseError('PDF text could not be extracted automatically. Please paste your resume text in the box below ↓')
       } else {
-        setParseError('Could not extract text from PDF. Please paste your resume text in the box below.')
+        setParseError(data.error || 'Could not read file. Please paste your resume text below ↓')
       }
     } catch {
-      setParseError('Network error parsing file. Please paste your resume text below.')
+      setParseError('Upload timed out. Please paste your resume text in the box below ↓')
     } finally {
       setIsParsing(false)
     }
