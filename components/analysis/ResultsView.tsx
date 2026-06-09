@@ -18,6 +18,7 @@ import { ResumeDiffViewer } from '@/components/resume/ResumeDiffViewer'
 import { FinalResume } from '@/components/resume/FinalResume'
 import { RoastAnnotations } from '@/components/resume/RoastAnnotations'
 import { RoastedResume } from '@/components/resume/RoastedResume'
+import { RoastCanvas } from '@/components/resume/RoastCanvas'
 import { InterviewPrep } from '@/components/interview/InterviewPrep'
 import { ResumeExporter } from '@/components/resume/ResumeExporter'
 import { useResumeStore } from '@/lib/store'
@@ -278,7 +279,7 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
-                    <p className="text-[11px] text-[var(--text-muted)]">Hover highlights · click margin notes for details</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Red pen annotations drawn directly on your resume</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
                     {loadingPanel === 'roast'
@@ -287,8 +288,11 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                     }
                   </Button>
                 </div>
-                <RoastedResume
+
+                {/* Canvas-based roast — PDF or text fallback */}
+                <RoastCanvas
                   resumeText={currentResumeText || resumeText}
+                  pdfFileUrl={resumeFileUrl || undefined}
                   annotations={roastAnnotations}
                   roastScore={roastResult?.roastScore}
                   roastScoreMeaning={roastResult?.roastScoreMeaning}
@@ -296,8 +300,62 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                   funniesLine={roastResult?.funniesLine}
                   biggestMissedOpportunity={roastResult?.biggestMissedOpportunity}
                   verdict={roastResult?.verdict}
-                  hasFile={!!resumeFileUrl}
                 />
+
+                {/* Score + verdict cards below canvas */}
+                {roastResult && (
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Roast score */}
+                    <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--bg-raised)]">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="text-3xl font-bold" style={{
+                          color: roastResult.roastScore >= 7 ? '#16a34a'
+                            : roastResult.roastScore >= 5 ? '#d97706'
+                            : '#cc0000'
+                        }}>
+                          {roastResult.roastScore.toFixed(1)}
+                          <span className="text-base font-normal text-[var(--text-muted)]">/10</span>
+                        </span>
+                        <span className="text-xs text-[var(--text-muted)]">{roastResult.roastScoreMeaning}</span>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{roastResult.overallVerdict}</p>
+                      {roastResult.funniesLine && (
+                        <p className="text-xs italic text-[var(--text-faint)] mt-2 border-t border-[var(--border)] pt-2">
+                          &ldquo;{roastResult.funniesLine}&rdquo;
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Verdict */}
+                    {roastResult.verdict && (
+                      <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--bg-raised)]">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-[var(--text)]">Recruiter Verdict</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            roastResult.verdict.shortlist === 'strong-yes' || roastResult.verdict.shortlist === 'yes'
+                              ? 'bg-green-500/20 text-green-400'
+                              : roastResult.verdict.shortlist === 'maybe'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {roastResult.verdict.shortlist.toUpperCase().replace('-', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)] mb-2">{roastResult.verdict.shortlistExplanation}</p>
+                        {roastResult.verdict.annoyed.length > 0 && (
+                          <div className="mt-1">
+                            <p className="text-[10px] font-medium text-red-400 mb-1">What annoyed me:</p>
+                            <ul className="space-y-0.5">
+                              {roastResult.verdict.annoyed.slice(0, 3).map((a, i) => (
+                                <li key={i} className="text-[10px] text-[var(--text-faint)]">• {a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
