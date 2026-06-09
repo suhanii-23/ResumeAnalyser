@@ -16,6 +16,7 @@ import { RecruiterView } from './RecruiterView'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { ResumeRenderer } from '@/components/resume/ResumeRenderer'
 import { ResumeDiffViewer } from '@/components/resume/ResumeDiffViewer'
+import { FinalResume } from '@/components/resume/FinalResume'
 import { RoastAnnotations } from '@/components/resume/RoastAnnotations'
 import { InterviewPrep } from '@/components/interview/InterviewPrep'
 import { ResumeExporter } from '@/components/resume/ResumeExporter'
@@ -29,7 +30,7 @@ interface ResultsViewProps {
 
 const NAV_ITEMS = [
   { id: 'chat', label: 'Edit Resume', icon: MessageSquare },
-  { id: 'resume', label: 'Preview', icon: FileSearch },
+  { id: 'resume', label: 'Final Resume', icon: FileSearch },
   { id: 'analysis', label: 'Analysis', icon: BarChart3 },
   { id: 'roast', label: 'Roast', icon: Flame },
   { id: 'recruiter', label: 'Recruiter', icon: UserCheck },
@@ -233,37 +234,14 @@ export function ResultsView({ onReset }: ResultsViewProps) {
           </div>
         )}
 
-        {/* Resume preview */}
+        {/* Final Resume — section changes + LaTeX */}
         {panel === 'resume' && (
-          <div className="flex flex-col h-full">
-            <div className="flex-shrink-0 bg-[var(--bg)] border-b border-[var(--border)] px-4 py-3 flex items-center justify-between">
-              <div>
-                <h1 className="text-sm font-semibold text-[var(--text)]">Resume Preview</h1>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  {resumeTextVersions.length > 0
-                    ? `v${resumeTextVersions.length + 1} — edited · ${resumeTextVersions[resumeTextVersions.length - 1]?.changeDescription}`
-                    : 'Original'}
-                </p>
-              </div>
-              <ResumeExporter schema={schema} resumeText={currentResumeText || resumeText} />
-            </div>
-
-            {/* Show original PDF if no edits, otherwise show edited text */}
-            {resumeTextVersions.length === 0 && resumeFileUrl ? (
-              <iframe
-                src={resumeFileUrl}
-                className="flex-1 w-full border-0"
-                title="Resume PDF"
-              />
-            ) : (
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="bg-white rounded-lg border border-[var(--border)] shadow-xl p-8 md:p-12 max-w-3xl mx-auto">
-                  <pre className="whitespace-pre-wrap font-sans text-[13px] text-gray-900 leading-relaxed">
-                    {currentResumeText || resumeText}
-                  </pre>
-                </div>
-              </div>
-            )}
+          <div className="flex flex-col h-full overflow-hidden">
+            <FinalResume
+              resumeText={currentResumeText || resumeText}
+              jdText={jdText}
+              analysisResult={analysisResult}
+            />
           </div>
         )}
 
