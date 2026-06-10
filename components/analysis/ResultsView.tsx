@@ -16,7 +16,7 @@ import { RecruiterView } from './RecruiterView'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { ResumeDiffViewer } from '@/components/resume/ResumeDiffViewer'
 import { FinalResume } from '@/components/resume/FinalResume'
-import { RoastCanvas } from '@/components/resume/RoastCanvas'
+import { RoastReport } from '@/components/resume/RoastReport'
 import { InterviewPrep } from '@/components/interview/InterviewPrep'
 import { ResumeExporter } from '@/components/resume/ResumeExporter'
 import { useResumeStore } from '@/lib/store'
@@ -41,10 +41,10 @@ type Panel = typeof NAV_ITEMS[number]['id']
 export function ResultsView({ onReset }: ResultsViewProps) {
   const {
     analysisResult, currentSchema,
-    roastV5, recruiterEvaluation, interviewPrep,
+    roastV6, recruiterEvaluation, interviewPrep,
     resumeText, jdText, activePanel,
-    currentResumeText, resumeTextVersions, resumeFileUrl,
-    setActivePanel, setRoastV5, setRecruiterEvaluation,
+    currentResumeText, resumeTextVersions,
+    setActivePanel, setRoastV6, setRecruiterEvaluation,
     setInterviewPrep, setChatMode,
   } = useResumeStore()
 
@@ -69,8 +69,8 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         }),
       })
       const data = await res.json()
-      if (data.result?.verdictStamp || data.result?.recruiterNotes) {
-        setRoastV5(data.result)
+      if (data.result?.overallVerdict || data.result?.firstImpression) {
+        setRoastV6(data.result)
         setActivePanel('roast')
       }
     } finally {
@@ -256,20 +256,22 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         {/* Roast */}
         {panel === 'roast' && (
           <div className="flex-1 overflow-y-auto">
-            {!roastV5 ? (
+            {!roastV6 ? (
 
-              /* ── Empty state ─────────────────────────────────────────── */
+              /* ── Empty state ──────────────────────────────────────────── */
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
                 <div className="text-6xl mb-5">🔥</div>
-                <p className="text-sm font-semibold text-[var(--text)] mb-2">Resume Roast</p>
-                <p className="text-xs text-[var(--text-muted)] max-w-sm mb-7 leading-relaxed">
-                  A senior recruiter reviews your resume with a red pen.
-                  Verdict stamp. Five major callouts. Ten specific notes.
-                  Every annotation earned, not generated.
+                <p className="text-base font-semibold text-[var(--text)] mb-2">Resume Roast</p>
+                <p className="text-xs text-[var(--text-muted)] max-w-sm mb-2 leading-relaxed">
+                  A senior recruiter, a hiring manager, a strict professor, and a sarcastic
+                  tech lead reviewed your resume together.
                 </p>
-                <Button onClick={runRoast} disabled={!!loadingPanel} variant="outline" size="lg">
+                <p className="text-xs text-[var(--text-faint)] max-w-xs mb-8 leading-relaxed">
+                  Section-by-section. Bullet by bullet. Funny, specific, and actionable.
+                </p>
+                <Button onClick={runRoast} disabled={!!loadingPanel} size="lg">
                   {loadingPanel === 'roast'
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analyzing…</>
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Roasting…</>
                     : '🔥 Roast My Resume'
                   }
                 </Button>
@@ -277,151 +279,21 @@ export function ResultsView({ onReset }: ResultsViewProps) {
 
             ) : (
 
-              /* ── Results ─────────────────────────────────────────────── */
-              <div className="flex flex-col lg:flex-row h-full min-h-0">
-
-                {/* Left: annotated resume canvas */}
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        1 verdict · 5 callouts · 10 notes
-                      </p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
-                      {loadingPanel === 'roast'
-                        ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
-                        : '🔥 Re-Roast'
-                      }
-                    </Button>
+              /* ── Report ───────────────────────────────────────────────── */
+              <div className="px-5 py-5">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
+                    <p className="text-[11px] text-[var(--text-muted)]">9 sections · section-by-section analysis</p>
                   </div>
-
-                  <RoastCanvas
-                    resumeText={currentResumeText || resumeText}
-                    pdfFileUrl={resumeFileUrl || undefined}
-                    roastData={roastV5}
-                  />
+                  <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
+                    {loadingPanel === 'roast'
+                      ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
+                      : '🔥 Re-Roast'
+                    }
+                  </Button>
                 </div>
-
-                {/* Right: analysis panel */}
-                <aside className="w-full lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] overflow-y-auto p-4 space-y-5">
-
-                  {/* Score + verdict stamp */}
-                  <div className="space-y-2">
-                    <div className="flex items-baseline gap-2">
-                      <span
-                        className="text-4xl font-black tabular-nums"
-                        style={{
-                          color: roastV5.roastScore >= 7 ? '#16a34a'
-                            : roastV5.roastScore >= 5 ? '#d97706'
-                            : '#c5000a',
-                        }}
-                      >
-                        {(roastV5.roastScore ?? 0).toFixed(1)}
-                      </span>
-                      <span className="text-sm text-[var(--text-faint)]">/10</span>
-                    </div>
-
-                    <div className="inline-block px-2.5 py-1 border-2 border-red-600/60 rounded text-[11px] font-black tracking-widest text-red-500">
-                      {roastV5.verdictStamp}
-                    </div>
-
-                    {roastV5.funniesLine && (
-                      <p className="text-[11px] italic text-[var(--text-muted)] leading-snug border-l-2 border-red-500/40 pl-2">
-                        &ldquo;{roastV5.funniesLine}&rdquo;
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Decision badge */}
-                  {roastV5.verdict?.shortlist && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Shortlist decision</p>
-                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                        ['strong-yes','yes'].includes(roastV5.verdict.shortlist)
-                          ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                          : roastV5.verdict.shortlist === 'maybe'
-                          ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30'
-                          : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                      }`}>
-                        {roastV5.verdict.shortlist.replace('-', ' ').toUpperCase()}
-                      </span>
-                      <p className="text-[10px] text-[var(--text-faint)] mt-1.5 leading-snug">
-                        {roastV5.verdict.shortlistExplanation}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Strengths */}
-                  {roastV5.strengths?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wider mb-1.5">What works</p>
-                      <ul className="space-y-1.5">
-                        {roastV5.strengths.map((s, i) => (
-                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug flex gap-1.5">
-                            <span className="text-green-500 shrink-0 mt-0.5">✓</span>
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Weaknesses */}
-                  {roastV5.weaknesses?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-1.5">What doesn&apos;t</p>
-                      <ul className="space-y-1.5">
-                        {roastV5.weaknesses.map((w, i) => (
-                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug flex gap-1.5">
-                            <span className="text-red-500 shrink-0 mt-0.5">✗</span>
-                            {w}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Biggest miss */}
-                  {roastV5.biggestMissedOpportunity && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wider mb-1.5">Biggest fix</p>
-                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.biggestMissedOpportunity}</p>
-                    </div>
-                  )}
-
-                  {/* ATS + recruiter concern */}
-                  <div className="space-y-3 border-t border-[var(--border)] pt-3">
-                    {roastV5.atsIssue && (
-                      <div>
-                        <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider mb-1">ATS Issue</p>
-                        <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.atsIssue}</p>
-                      </div>
-                    )}
-                    {roastV5.recruiterConcern && (
-                      <div>
-                        <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-1">Recruiter concern</p>
-                        <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.recruiterConcern}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Interview traps */}
-                  {roastV5.verdict?.interviewQuestions?.length > 0 && (
-                    <div className="border-t border-[var(--border)] pt-3">
-                      <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-1.5">Interview traps</p>
-                      <ul className="space-y-2">
-                        {roastV5.verdict.interviewQuestions.slice(0, 3).map((q, i) => (
-                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug">
-                            <span className="text-orange-500 font-medium">Q: </span>{q}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                </aside>
+                <RoastReport data={roastV6} />
               </div>
             )}
           </div>

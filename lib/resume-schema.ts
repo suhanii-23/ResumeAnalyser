@@ -87,31 +87,91 @@ export interface RoastResult {
   verdict: RoastVerdict
 }
 
-// ── V5 schema — quality over quantity ────────────────────────────────────────
+// ── Roast V6 — section-by-section text roast ─────────────────────────────────
 
-export interface RoastNote {
-  targetText: string   // exact phrase from the resume to attach to
-  note: string         // the comment (one punchy sentence max)
-  markType: 'underline' | 'circle' | 'strikethrough'
+export interface RoastPhrase {
+  original: string
+  whyWeak: string
+  recruiterTranslation: string
+  suggestedReplacement: string
 }
 
-export interface RoastV5 {
-  // Analysis (shown in the side panel)
-  strengths: string[]          // exactly 3
-  weaknesses: string[]         // exactly 5
-  atsIssue: string             // single biggest gap
-  recruiterConcern: string     // single biggest concern
+export interface RoastBullet {
+  bullet: string
+  roast: string
+  recruiterThinks: string
+  betterVersion: string
+}
 
-  // Annotation content — placement decided by renderer
-  verdictStamp: string         // ONE: REJECTED | PROMISING BUT VAGUE | MAYBE | INTERVIEWABLE | STRONG TECHNICAL PROFILE
-  majorCallouts: string[]      // exactly 5 large callouts
-  recruiterNotes: RoastNote[]  // exactly 10 specific notes
+export interface RoastExperienceEntry {
+  company: string
+  role: string
+  bullets: RoastBullet[]
+}
 
-  // Summary
-  roastScore: number           // 1.0–10.0
-  funniesLine: string
-  biggestMissedOpportunity: string
-  verdict: RoastVerdict
+export interface RoastProjectEntry {
+  projectName: string
+  recruiterCares: boolean
+  recruiterCaresReason: string
+  hiringManagerCares: boolean
+  engineerCares: boolean
+  roast: string
+  concern: string
+  fix: string
+  projectType: 'crud' | 'tutorial' | 'clone' | 'filler' | 'solid' | 'unknown'
+}
+
+export interface RoastV6 {
+  // §0 — Overall
+  overallVerdict: string
+  resumeRating: number
+  recruiterInterest: 'reject' | 'maybe' | 'shortlist' | 'strong-shortlist'
+
+  // §1 — First Impression
+  firstImpression: {
+    stoodOut: string
+    confused: string
+    keepReading: string
+    almostStopped: string
+  }
+
+  // §2 — Summary
+  summaryRoast: RoastPhrase[]
+
+  // §3 — Experience
+  experienceRoast: RoastExperienceEntry[]
+
+  // §4 — Projects
+  projectsRoast: RoastProjectEntry[]
+
+  // §5 — Skills
+  skillsRoast: {
+    overallRoast: string
+    recruiterThinks: string
+    issues: string[]
+    flaggedSkills: string[]
+  }
+
+  // §6 — ATS
+  atsRoast: {
+    overallRoast: string
+    missingKeywords: string[]
+    weakKeywords: string[]
+    overusedKeywords: string[]
+  }
+
+  // §7 — Interviewer Mode
+  interviewerMode: {
+    questionsIWouldAsk: string[]
+    thingsISuspectAreExaggerated: string[]
+    thingsIWantProofOf: string[]
+  }
+
+  // §8 — Hardest Truth
+  hardestTruth: string
+
+  // §9 — 30-minute fix list
+  top10Fixes: string[]
 }
 
 export interface RecruiterEvaluation {
