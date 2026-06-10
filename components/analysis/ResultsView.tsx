@@ -41,10 +41,10 @@ type Panel = typeof NAV_ITEMS[number]['id']
 export function ResultsView({ onReset }: ResultsViewProps) {
   const {
     analysisResult, currentSchema,
-    roastV4, recruiterEvaluation, interviewPrep,
+    roastV5, recruiterEvaluation, interviewPrep,
     resumeText, jdText, activePanel,
     currentResumeText, resumeTextVersions, resumeFileUrl,
-    setActivePanel, setRoastV4, setRecruiterEvaluation,
+    setActivePanel, setRoastV5, setRecruiterEvaluation,
     setInterviewPrep, setChatMode,
   } = useResumeStore()
 
@@ -69,8 +69,8 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         }),
       })
       const data = await res.json()
-      if (data.result?.lineRoasts || data.result?.majorCallouts) {
-        setRoastV4(data.result)
+      if (data.result?.verdictStamp || data.result?.recruiterNotes) {
+        setRoastV5(data.result)
         setActivePanel('roast')
       }
     } finally {
@@ -256,140 +256,172 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         {/* Roast */}
         {panel === 'roast' && (
           <div className="flex-1 overflow-y-auto">
-            {!roastV4 ? (
+            {!roastV5 ? (
+
+              /* ── Empty state ─────────────────────────────────────────── */
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
                 <div className="text-6xl mb-5">🔥</div>
                 <p className="text-sm font-semibold text-[var(--text)] mb-2">Resume Roast</p>
-                <p className="text-xs text-[var(--text-muted)] max-w-sm mb-2 leading-relaxed">
-                  A senior recruiter takes a red Sharpie to your resume — every vague bullet, every buzzword,
-                  every unprovable claim circled and called out.
-                </p>
-                <p className="text-[11px] text-[var(--text-faint)] max-w-xs mb-7 leading-relaxed">
-                  First reaction: <em>&ldquo;Oh my god, my resume got destroyed.&rdquo;</em><br />
-                  Second reaction: <em>&ldquo;Wait… these comments are actually right.&rdquo;</em>
+                <p className="text-xs text-[var(--text-muted)] max-w-sm mb-7 leading-relaxed">
+                  A senior recruiter reviews your resume with a red pen.
+                  Verdict stamp. Five major callouts. Ten specific notes.
+                  Every annotation earned, not generated.
                 </p>
                 <Button onClick={runRoast} disabled={!!loadingPanel} variant="outline" size="lg">
                   {loadingPanel === 'roast'
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sharpening the red pen…</>
-                    : <><span className="mr-2">🔥</span>Roast My Resume</>
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analyzing…</>
+                    : '🔥 Roast My Resume'
                   }
                 </Button>
               </div>
+
             ) : (
-              <div className="px-5 py-4 space-y-5">
-                {/* Header row */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      {(roastV4.lineRoasts?.length || 0) + (roastV4.sectionRoasts?.length || 0)} annotations · red pen on your resume
-                    </p>
+
+              /* ── Results ─────────────────────────────────────────────── */
+              <div className="flex flex-col lg:flex-row h-full min-h-0">
+
+                {/* Left: annotated resume canvas */}
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        1 verdict · 5 callouts · 10 notes
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
+                      {loadingPanel === 'roast'
+                        ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
+                        : '🔥 Re-Roast'
+                      }
+                    </Button>
                   </div>
-                  <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
-                    {loadingPanel === 'roast'
-                      ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
-                      : '🔥 Re-Roast'
-                    }
-                  </Button>
+
+                  <RoastCanvas
+                    resumeText={currentResumeText || resumeText}
+                    pdfFileUrl={resumeFileUrl || undefined}
+                    roastData={roastV5}
+                  />
                 </div>
 
-                {/* Score + verdict summary bar */}
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-raised)] p-4 flex flex-wrap gap-6 items-start">
-                  {/* Score */}
-                  <div className="shrink-0">
-                    <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1">Roast Score</div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black" style={{
-                        color: roastV4.roastScore >= 7 ? '#16a34a' : roastV4.roastScore >= 5 ? '#d97706' : '#cc0000'
-                      }}>
-                        {(roastV4.roastScore || 0).toFixed(1)}
+                {/* Right: analysis panel */}
+                <aside className="w-full lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] overflow-y-auto p-4 space-y-5">
+
+                  {/* Score + verdict stamp */}
+                  <div className="space-y-2">
+                    <div className="flex items-baseline gap-2">
+                      <span
+                        className="text-4xl font-black tabular-nums"
+                        style={{
+                          color: roastV5.roastScore >= 7 ? '#16a34a'
+                            : roastV5.roastScore >= 5 ? '#d97706'
+                            : '#c5000a',
+                        }}
+                      >
+                        {(roastV5.roastScore ?? 0).toFixed(1)}
                       </span>
                       <span className="text-sm text-[var(--text-faint)]">/10</span>
                     </div>
-                  </div>
-                  {/* Verdict */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1">Overall Verdict</div>
-                    <p className="text-xs text-[var(--text)] leading-relaxed">{roastV4.overallVerdict}</p>
-                    {roastV4.funniesLine && (
-                      <p className="text-[11px] italic text-red-400 mt-1.5">
-                        &ldquo;{roastV4.funniesLine}&rdquo;
+
+                    <div className="inline-block px-2.5 py-1 border-2 border-red-600/60 rounded text-[11px] font-black tracking-widest text-red-500">
+                      {roastV5.verdictStamp}
+                    </div>
+
+                    {roastV5.funniesLine && (
+                      <p className="text-[11px] italic text-[var(--text-muted)] leading-snug border-l-2 border-red-500/40 pl-2">
+                        &ldquo;{roastV5.funniesLine}&rdquo;
                       </p>
                     )}
                   </div>
-                  {/* Shortlist badge */}
-                  {roastV4.verdict?.shortlist && (
-                    <div className="shrink-0 text-right">
-                      <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1">Decision</div>
-                      <span className={`text-[11px] font-bold px-3 py-1 rounded-full inline-block ${
-                        roastV4.verdict.shortlist === 'strong-yes' || roastV4.verdict.shortlist === 'yes'
+
+                  {/* Decision badge */}
+                  {roastV5.verdict?.shortlist && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Shortlist decision</p>
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        ['strong-yes','yes'].includes(roastV5.verdict.shortlist)
                           ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                          : roastV4.verdict.shortlist === 'maybe'
+                          : roastV5.verdict.shortlist === 'maybe'
                           ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30'
                           : 'bg-red-500/15 text-red-400 border border-red-500/30'
                       }`}>
-                        {roastV4.verdict.shortlist.replace('-', ' ').toUpperCase()}
+                        {roastV5.verdict.shortlist.replace('-', ' ').toUpperCase()}
                       </span>
-                      <p className="text-[10px] text-[var(--text-faint)] mt-1 max-w-[180px]">
-                        {roastV4.verdict.shortlistExplanation?.slice(0, 80)}…
+                      <p className="text-[10px] text-[var(--text-faint)] mt-1.5 leading-snug">
+                        {roastV5.verdict.shortlistExplanation}
                       </p>
                     </div>
                   )}
-                </div>
 
-                {/* The annotated resume canvas */}
-                <RoastCanvas
-                  resumeText={currentResumeText || resumeText}
-                  pdfFileUrl={resumeFileUrl || undefined}
-                  roastData={roastV4}
-                />
-
-                {/* Bottom cards: what annoyed + interview traps + biggest miss */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6">
-                  {/* What annoyed me */}
-                  {roastV4.verdict?.annoyed?.length > 0 && (
-                    <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-raised)]">
-                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-2">What annoyed me</p>
+                  {/* Strengths */}
+                  {roastV5.strengths?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wider mb-1.5">What works</p>
                       <ul className="space-y-1.5">
-                        {roastV4.verdict.annoyed.map((a, i) => (
-                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug">• {a}</li>
+                        {roastV5.strengths.map((s, i) => (
+                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug flex gap-1.5">
+                            <span className="text-green-500 shrink-0 mt-0.5">✓</span>
+                            {s}
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {/* Interview traps */}
-                  {roastV4.interviewQuestions?.length > 0 && (
-                    <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-raised)]">
-                      <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-2">Interview traps I&apos;d set</p>
+
+                  {/* Weaknesses */}
+                  {roastV5.weaknesses?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-1.5">What doesn&apos;t</p>
                       <ul className="space-y-1.5">
-                        {roastV4.interviewQuestions.slice(0, 4).map((q, i) => (
-                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug">• {q}</li>
+                        {roastV5.weaknesses.map((w, i) => (
+                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug flex gap-1.5">
+                            <span className="text-red-500 shrink-0 mt-0.5">✗</span>
+                            {w}
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {/* Biggest miss + ATS gaps */}
-                  <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-raised)] space-y-3">
-                    {roastV4.biggestMissedOpportunity && (
+
+                  {/* Biggest miss */}
+                  {roastV5.biggestMissedOpportunity && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wider mb-1.5">Biggest fix</p>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.biggestMissedOpportunity}</p>
+                    </div>
+                  )}
+
+                  {/* ATS + recruiter concern */}
+                  <div className="space-y-3 border-t border-[var(--border)] pt-3">
+                    {roastV5.atsIssue && (
                       <div>
-                        <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wider mb-1">Biggest missed opportunity</p>
-                        <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV4.biggestMissedOpportunity}</p>
+                        <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider mb-1">ATS Issue</p>
+                        <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.atsIssue}</p>
                       </div>
                     )}
-                    {roastV4.atsRoasts?.length > 0 && (
+                    {roastV5.recruiterConcern && (
                       <div>
-                        <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider mb-1">Missing keywords</p>
-                        <div className="flex flex-wrap gap-1">
-                          {roastV4.atsRoasts.slice(0, 6).map((a, i) => (
-                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-overlay)] text-[var(--text-muted)] border border-[var(--border)]">
-                              {a.keyword}
-                            </span>
-                          ))}
-                        </div>
+                        <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-1">Recruiter concern</p>
+                        <p className="text-[11px] text-[var(--text-muted)] leading-snug">{roastV5.recruiterConcern}</p>
                       </div>
                     )}
                   </div>
-                </div>
+
+                  {/* Interview traps */}
+                  {roastV5.verdict?.interviewQuestions?.length > 0 && (
+                    <div className="border-t border-[var(--border)] pt-3">
+                      <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-1.5">Interview traps</p>
+                      <ul className="space-y-2">
+                        {roastV5.verdict.interviewQuestions.slice(0, 3).map((q, i) => (
+                          <li key={i} className="text-[11px] text-[var(--text-muted)] leading-snug">
+                            <span className="text-orange-500 font-medium">Q: </span>{q}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                </aside>
               </div>
             )}
           </div>

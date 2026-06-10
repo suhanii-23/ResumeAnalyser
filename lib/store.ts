@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import {
   ResumeSchema, ResumeVersion, RoastAnnotation,
-  RecruiterEvaluation, InterviewPrepResult, RoastResult, RoastV4
+  RecruiterEvaluation, InterviewPrepResult, RoastResult, RoastV5
 } from './resume-schema'
 
 export interface SubScore {
@@ -85,7 +85,7 @@ export interface ResumeStore {
   analysisResult: AnalysisResult | null
   roastAnnotations: RoastAnnotation[]
   roastResult: RoastResult | null
-  roastV4: RoastV4 | null
+  roastV5: RoastV5 | null
   recruiterEvaluation: RecruiterEvaluation | null
   interviewPrep: InterviewPrepResult | null
 
@@ -115,7 +115,7 @@ export interface ResumeStore {
   setAnalysisResult: (r: AnalysisResult | null) => void
   setRoastAnnotations: (a: RoastAnnotation[]) => void
   setRoastResult: (r: RoastResult | null) => void
-  setRoastV4: (r: RoastV4 | null) => void
+  setRoastV5: (r: RoastV5 | null) => void
   setRecruiterEvaluation: (e: RecruiterEvaluation | null) => void
   setInterviewPrep: (p: InterviewPrepResult | null) => void
   addChatMessage: (m: ChatMessage) => void
@@ -146,7 +146,7 @@ const initial = {
   analysisResult: null,
   roastAnnotations: [],
   roastResult: null,
-  roastV4: null,
+  roastV5: null,
   recruiterEvaluation: null,
   interviewPrep: null,
   chatMessages: [],
@@ -179,7 +179,7 @@ export const useResumeStore = create<ResumeStore>((set, get) => ({
   setAnalysisResult: (r) => set({ analysisResult: r }),
   setRoastAnnotations: (a) => set({ roastAnnotations: a }),
   setRoastResult: (r) => set({ roastResult: r }),
-  setRoastV4: (r) => set({ roastV4: r }),
+  setRoastV5: (r) => set({ roastV5: r }),
   setRecruiterEvaluation: (e) => set({ recruiterEvaluation: e }),
   setInterviewPrep: (p) => set({ interviewPrep: p }),
   addChatMessage: (m) => set((s) => ({ chatMessages: [...s.chatMessages, m] })),

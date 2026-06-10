@@ -87,44 +87,28 @@ export interface RoastResult {
   verdict: RoastVerdict
 }
 
-// ── V4 schema ─────────────────────────────────────────────────────────────────
+// ── V5 schema — quality over quantity ────────────────────────────────────────
 
-/** Level 1 — Giant diagonal stamp over a section */
-export interface V4MajorCallout {
-  text: string       // e.g. "REJECTED" | "PROMISING BUT VAGUE"
-  section: string
+export interface RoastNote {
+  targetText: string   // exact phrase from the resume to attach to
+  note: string         // the comment (one punchy sentence max)
+  markType: 'underline' | 'circle' | 'strikethrough'
 }
 
-/** Level 2/3 — Section-level callout near a section header */
-export interface V4SectionRoast {
-  section: string    // e.g. "Experience"
-  callout: string    // e.g. "BUZZWORD SOUP"
-  level: 2 | 3
-}
+export interface RoastV5 {
+  // Analysis (shown in the side panel)
+  strengths: string[]          // exactly 3
+  weaknesses: string[]         // exactly 5
+  atsIssue: string             // single biggest gap
+  recruiterConcern: string     // single biggest concern
 
-/** Level 2/3/4 — Specific line or phrase annotation */
-export interface V4LineRoast {
-  targetText: string // EXACT verbatim text from resume (5-60 chars)
-  comment: string
-  level: 2 | 3 | 4
-  markType: 'circle' | 'underline' | 'strikethrough' | 'box'
-}
+  // Annotation content — placement decided by renderer
+  verdictStamp: string         // ONE: REJECTED | PROMISING BUT VAGUE | MAYBE | INTERVIEWABLE | STRONG TECHNICAL PROFILE
+  majorCallouts: string[]      // exactly 5 large callouts
+  recruiterNotes: RoastNote[]  // exactly 10 specific notes
 
-export interface V4AtsRoast {
-  keyword: string    // missing keyword from JD
-  comment: string
-}
-
-export interface RoastV4 {
-  overallVerdict: string
-  roastScore: number
-  density: 'light' | 'medium' | 'heavy'
-  majorCallouts: V4MajorCallout[]
-  sectionRoasts: V4SectionRoast[]
-  lineRoasts: V4LineRoast[]
-  atsRoasts: V4AtsRoast[]
-  interviewQuestions: string[]
-  recruiterConcerns: string[]
+  // Summary
+  roastScore: number           // 1.0–10.0
   funniesLine: string
   biggestMissedOpportunity: string
   verdict: RoastVerdict
