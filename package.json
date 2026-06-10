@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@types/pdf-parse": "^1.1.5",
+    "@types/use-sync-external-store": "^1.5.0",
     "autoprefixer": "^10.4.0"
   }
 }

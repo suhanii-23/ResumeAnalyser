@@ -87,6 +87,49 @@ export interface RoastResult {
   verdict: RoastVerdict
 }
 
+// ── V4 schema ─────────────────────────────────────────────────────────────────
+
+/** Level 1 — Giant diagonal stamp over a section */
+export interface V4MajorCallout {
+  text: string       // e.g. "REJECTED" | "PROMISING BUT VAGUE"
+  section: string
+}
+
+/** Level 2/3 — Section-level callout near a section header */
+export interface V4SectionRoast {
+  section: string    // e.g. "Experience"
+  callout: string    // e.g. "BUZZWORD SOUP"
+  level: 2 | 3
+}
+
+/** Level 2/3/4 — Specific line or phrase annotation */
+export interface V4LineRoast {
+  targetText: string // EXACT verbatim text from resume (5-60 chars)
+  comment: string
+  level: 2 | 3 | 4
+  markType: 'circle' | 'underline' | 'strikethrough' | 'box'
+}
+
+export interface V4AtsRoast {
+  keyword: string    // missing keyword from JD
+  comment: string
+}
+
+export interface RoastV4 {
+  overallVerdict: string
+  roastScore: number
+  density: 'light' | 'medium' | 'heavy'
+  majorCallouts: V4MajorCallout[]
+  sectionRoasts: V4SectionRoast[]
+  lineRoasts: V4LineRoast[]
+  atsRoasts: V4AtsRoast[]
+  interviewQuestions: string[]
+  recruiterConcerns: string[]
+  funniesLine: string
+  biggestMissedOpportunity: string
+  verdict: RoastVerdict
+}
+
 export interface RecruiterEvaluation {
   firstImpression: string
   keepReading: boolean

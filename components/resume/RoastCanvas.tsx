@@ -3,620 +3,675 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Loader2, Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { RoastAnnotation, RoastVerdict } from '@/lib/resume-schema'
+import { RoastV4, V4LineRoast, V4SectionRoast, V4MajorCallout, RoastVerdict } from '@/lib/resume-schema'
 
-interface RoastCanvasProps {
-  resumeText: string
-  pdfFileUrl?: string
-  annotations: RoastAnnotation[]
-  roastScore?: number
-  roastScoreMeaning?: string
-  overallVerdict?: string
-  funniesLine?: string
-  biggestMissedOpportunity?: string
-  verdict?: RoastVerdict
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TextItem {
+  str: string
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
-// ── Seeded pseudo-random so annotations stay stable on re-render ──────────────
-function makeRng(seed: number) {
-  let s = seed
-  return () => {
+interface PlacedMark {
+  // Where the target text lives on canvas
+  textX: number; textY: number; textW: number; textH: number
+  // Which mark to draw on the text
+  markType: V4LineRoast['markType']
+}
+
+interface PlacedComment {
+  text: string          // what to write
+  x: number; y: number // where to draw it
+  rotation: number
+  fontSize: number
+  color: string
+  alpha: number
+  // optional arrow back to the text
+  arrowToX?: number; arrowToY?: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seeded RNG
+// ─────────────────────────────────────────────────────────────────────────────
+
+function rng(seed: number) {
+  let s = (seed * 1664525 + 1013904223) & 0xffffffff
+  const next = () => {
     s = (s * 1664525 + 1013904223) & 0xffffffff
     return (s >>> 0) / 0xffffffff
   }
+  return next
 }
 
-// ── Drawing primitives ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Drawing primitives — everything wobbly on purpose
+// ─────────────────────────────────────────────────────────────────────────────
 
-function roughLine(
-  ctx: CanvasRenderingContext2D,
-  x1: number, y1: number, x2: number, y2: number,
-  rng: () => number
-) {
+function jitter(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, r: () => number) {
+  const steps = Math.max(6, Math.round(Math.hypot(x2 - x1, y2 - y1) / 8))
   ctx.beginPath()
-  ctx.moveTo(x1 + rng() * 2 - 1, y1 + rng() * 2 - 1)
-  const steps = Math.max(8, Math.round(Math.hypot(x2 - x1, y2 - y1) / 6))
+  ctx.moveTo(x1 + r() * 2 - 1, y1 + r() * 2 - 1)
   for (let i = 1; i <= steps; i++) {
     const t = i / steps
     ctx.lineTo(
-      x1 + (x2 - x1) * t + (rng() * 4 - 2),
-      y1 + (y2 - y1) * t + (rng() * 4 - 2)
+      x1 + (x2 - x1) * t + (r() * 5 - 2.5),
+      y1 + (y2 - y1) * t + (r() * 5 - 2.5),
     )
   }
   ctx.stroke()
 }
 
-function roughCircle(
-  ctx: CanvasRenderingContext2D,
-  cx: number, cy: number, rx: number, ry: number,
-  rng: () => number
+function wobbleCircle(
+  ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, r: () => number
 ) {
   ctx.beginPath()
   let first = true
-  for (let deg = 0; deg <= 370; deg += 4) {
-    const angle = (deg * Math.PI) / 180
-    const wobble = 1 + (rng() - 0.5) * 0.18
-    const x = cx + rx * wobble * Math.cos(angle)
-    const y = cy + ry * wobble * Math.sin(angle)
+  for (let deg = 0; deg <= 375; deg += 5) {
+    const θ = (deg * Math.PI) / 180
+    const wobble = 1 + (r() - 0.5) * 0.22
+    const x = cx + rx * wobble * Math.cos(θ)
+    const y = cy + ry * wobble * Math.sin(θ)
     first ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
     first = false
   }
   ctx.stroke()
 }
 
-function drawArrow(
-  ctx: CanvasRenderingContext2D,
-  x1: number, y1: number, x2: number, y2: number,
-  rng: () => number
-) {
-  // Curved arrow
-  const mx = (x1 + x2) / 2 + (rng() * 40 - 20)
-  const my = (y1 + y2) / 2 + (rng() * 40 - 20)
-  ctx.beginPath()
-  ctx.moveTo(x1, y1)
-  ctx.quadraticCurveTo(mx, my, x2, y2)
-  ctx.stroke()
-  // Arrowhead
-  const angle = Math.atan2(y2 - my, x2 - mx)
-  const size = 10
-  ctx.beginPath()
-  ctx.moveTo(x2, y2)
-  ctx.lineTo(
-    x2 - size * Math.cos(angle - 0.4),
-    y2 - size * Math.sin(angle - 0.4)
-  )
-  ctx.moveTo(x2, y2)
-  ctx.lineTo(
-    x2 - size * Math.cos(angle + 0.4),
-    y2 - size * Math.sin(angle + 0.4)
-  )
-  ctx.stroke()
-}
-
-function drawWavedUnderline(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, width: number,
-  rng: () => number
-) {
+function waveUnderline(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, r: () => number) {
   ctx.beginPath()
   ctx.moveTo(x, y)
-  const waves = Math.max(3, Math.round(width / 12))
-  for (let i = 0; i <= waves; i++) {
-    const px = x + (width / waves) * i
-    const py = y + (i % 2 === 0 ? 3 : -3) + (rng() * 2 - 1)
+  const waves = Math.max(4, Math.round(w / 10))
+  for (let i = 1; i <= waves; i++) {
+    const px = x + (w / waves) * i
+    const py = y + (i % 2 === 0 ? 4 : -4) + (r() * 2 - 1)
     ctx.lineTo(px, py)
   }
   ctx.stroke()
 }
 
-function drawStrikethrough(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, width: number,
-  rng: () => number
-) {
-  roughLine(ctx, x, y, x + width, y + (rng() * 4 - 2), rng)
+function roughBox(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: () => number) {
+  // Draw as four separate wobbly lines
+  ctx.beginPath()
+  ctx.moveTo(x + r() * 2, y + r() * 2)
+  ctx.lineTo(x + w + r() * 2, y + r() * 2)
+  ctx.lineTo(x + w + r() * 2, y + h + r() * 2)
+  ctx.lineTo(x + r() * 2, y + h + r() * 2)
+  ctx.closePath()
+  ctx.stroke()
 }
 
-function drawHandwrittenText(
+function curvedArrow(
   ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number, y: number,
-  fontSize: number,
-  rotation: number,
-  color: string,
-  font: string
+  x1: number, y1: number, x2: number, y2: number,
+  r: () => number
+) {
+  const mx = (x1 + x2) / 2 + (r() * 50 - 25)
+  const my = (y1 + y2) / 2 + (r() * 30 - 15)
+  ctx.beginPath()
+  ctx.moveTo(x1, y1)
+  ctx.quadraticCurveTo(mx, my, x2, y2)
+  ctx.stroke()
+  // arrowhead
+  const angle = Math.atan2(y2 - my, x2 - mx)
+  const sz = 9
+  ctx.beginPath()
+  ctx.moveTo(x2, y2)
+  ctx.lineTo(x2 - sz * Math.cos(angle - 0.45), y2 - sz * Math.sin(angle - 0.45))
+  ctx.moveTo(x2, y2)
+  ctx.lineTo(x2 - sz * Math.cos(angle + 0.45), y2 - sz * Math.sin(angle + 0.45))
+  ctx.stroke()
+}
+
+function stampText(
+  ctx: CanvasRenderingContext2D,
+  text: string, cx: number, cy: number,
+  rotation: number, fontSize: number,
+  color: string, alpha: number, font: string
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate((rotation * Math.PI) / 180)
+  ctx.globalAlpha = alpha
+  ctx.font = `900 ${fontSize}px "${font}", cursive`
+  const mw = ctx.measureText(text).width
+  const pad = 14
+  ctx.strokeStyle = color
+  ctx.lineWidth = Math.max(3, fontSize / 14)
+  ctx.strokeRect(-mw / 2 - pad, -fontSize - 2, mw + pad * 2, fontSize + 18)
+  ctx.fillStyle = color
+  ctx.fillText(text, -mw / 2, 0)
+  ctx.restore()
+}
+
+function handText(
+  ctx: CanvasRenderingContext2D,
+  text: string, x: number, y: number,
+  rotation: number, fontSize: number,
+  color: string, alpha: number, font: string
 ) {
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate((rotation * Math.PI) / 180)
+  ctx.globalAlpha = alpha
   ctx.fillStyle = color
   ctx.font = `bold ${fontSize}px "${font}", cursive`
   ctx.fillText(text, 0, 0)
   ctx.restore()
 }
 
-function drawStamp(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  cx: number, cy: number,
-  rotation: number,
-  fontSize: number,
-  color: string,
-  font: string
-) {
-  ctx.save()
-  ctx.translate(cx, cy)
-  ctx.rotate((rotation * Math.PI) / 180)
+// ─────────────────────────────────────────────────────────────────────────────
+// Text search
+// ─────────────────────────────────────────────────────────────────────────────
 
-  // Measure text for border
-  ctx.font = `900 ${fontSize}px "${font}", cursive`
-  const metrics = ctx.measureText(text)
-  const tw = metrics.width
-  const pad = 12
-
-  // Hollow stamp border
-  ctx.strokeStyle = color
-  ctx.lineWidth = 4
-  ctx.globalAlpha = 0.82
-  ctx.strokeRect(-tw / 2 - pad, -fontSize - 4, tw + pad * 2, fontSize + 18)
-
-  // Text
-  ctx.fillStyle = color
-  ctx.fillText(text, -tw / 2, 0)
-  ctx.restore()
-}
-
-// ── Text renderer for text-only fallback ──────────────────────────────────────
-
-interface TextBlock { text: string; x: number; y: number; w: number; h: number; fontSize: number }
-
-function renderResumeText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  canvasWidth: number
-): TextBlock[] {
-  const blocks: TextBlock[] = []
-  const lines = text.split('\n')
-  const margin = 72
-  const maxWidth = canvasWidth - margin * 2
-  let y = 60
-  const baseFont = 13
-  const lineH = baseFont * 1.65
-
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, canvasWidth, 9999) // filled dynamically
-
-  for (const raw of lines) {
-    const line = raw.trimEnd()
-    const isEmpty = line.trim() === ''
-
-    if (isEmpty) { y += lineH * 0.5; continue }
-
-    // Detect headings (all-caps short lines)
-    const isHeading = /^[A-Z][A-Z\s]+$/.test(line.trim()) && line.trim().length < 30
-    const isBullet = line.trim().startsWith('•') || line.trim().startsWith('-') || line.trim().startsWith('◦')
-    const isName = y < 120 && !isBullet
-
-    const fontSize = isName ? 22 : isHeading ? 14 : baseFont
-    const fontWeight = isHeading || isName ? 'bold' : 'normal'
-    ctx.font = `${fontWeight} ${fontSize}px Georgia, serif`
-    ctx.fillStyle = '#111'
-
-    // Word wrap
-    const words = line.split(' ')
-    let currentLine = ''
-    const wrappedLines: string[] = []
-    for (const word of words) {
-      const test = currentLine ? currentLine + ' ' + word : word
-      if (ctx.measureText(test).width > maxWidth) {
-        wrappedLines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = test
-      }
-    }
-    if (currentLine) wrappedLines.push(currentLine)
-
-    if (isHeading) {
-      y += 4
-      ctx.strokeStyle = '#333'
-      ctx.lineWidth = 0.8
-      const hw = Math.min(ctx.measureText(line.trim()).width + 20, maxWidth)
-      ctx.beginPath()
-      ctx.moveTo(margin, y + 4)
-      ctx.lineTo(margin + hw, y + 4)
-      ctx.stroke()
-    }
-
-    for (const wl of wrappedLines) {
-      ctx.fillStyle = '#111'
-      ctx.fillText(wl, margin, y)
-      const w = ctx.measureText(wl).width
-      blocks.push({ text: wl, x: margin, y: y - fontSize, w, h: fontSize + 4, fontSize })
-      y += lineH * (fontSize / baseFont)
-    }
-
-    if (isHeading) y += 2
+function findText(items: TextItem[], target: string): TextItem | null {
+  if (!target?.trim() || target.length < 3) return null
+  const tl = target.toLowerCase().trim()
+  // exact substring match
+  for (const it of items) {
+    if (it.str.toLowerCase().includes(tl.slice(0, 30))) return it
   }
-
-  return blocks
-}
-
-// ── Find anchor text in rendered blocks ───────────────────────────────────────
-
-function findTextPosition(
-  blocks: TextBlock[],
-  anchor: string,
-  canvasWidth: number,
-  canvasHeight: number,
-  rng: () => number
-): { x: number; y: number; w: number; h: number } | null {
-  if (!anchor || anchor.length < 3) return null
-
-  const anchorLower = anchor.toLowerCase().trim().slice(0, 40)
-
-  for (const block of blocks) {
-    if (block.text.toLowerCase().includes(anchorLower.slice(0, 20))) {
-      return { x: block.x, y: block.y, w: block.w, h: block.h }
+  // first 15 chars
+  const short = tl.slice(0, 15)
+  for (const it of items) {
+    if (it.str.toLowerCase().includes(short)) return it
+  }
+  // first word
+  const word = tl.split(/\s+/)[0]
+  if (word.length >= 4) {
+    for (const it of items) {
+      if (it.str.toLowerCase().includes(word)) return it
     }
   }
-
-  // Fuzzy: first 15 chars
-  const short = anchorLower.slice(0, 15)
-  for (const block of blocks) {
-    if (block.text.toLowerCase().includes(short)) {
-      return { x: block.x, y: block.y, w: block.w, h: block.h }
-    }
-  }
-
-  // Fallback: random position in page content area
-  return {
-    x: 80 + rng() * (canvasWidth - 200),
-    y: 120 + rng() * (canvasHeight - 300),
-    w: 180, h: 14,
-  }
-}
-
-// ── Find text in pdfjs text items ─────────────────────────────────────────────
-
-interface PdfTextItem {
-  str: string
-  transform: number[]
-  width: number
-  height: number
-}
-
-function findAnchorInPdfItems(
-  items: PdfTextItem[],
-  anchor: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  viewport: { width: number; height: number; convertToViewportPoint: (x: number, y: number) => any },
-  scale: number,
-  rng: () => number
-): { x: number; y: number; w: number; h: number } | null {
-  if (!anchor || anchor.length < 3) return null
-
-  const al = anchor.toLowerCase().trim()
-
-  // Try to find item containing the anchor text
-  for (const item of items) {
-    if (!item.str?.trim()) continue
-    if (item.str.toLowerCase().includes(al.slice(0, 20))) {
-      const [cx, cy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5])
-      return { x: cx - 2, y: cy - item.height * scale - 4, w: item.width * scale + 4, h: item.height * scale + 8 }
-    }
-  }
-
-  // Fuzzy: first 12 chars
-  const short = al.slice(0, 12)
-  for (const item of items) {
-    if (item.str?.toLowerCase().includes(short)) {
-      const [cx, cy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5])
-      return { x: cx - 2, y: cy - item.height * scale - 4, w: item.width * scale + 4, h: item.height * scale + 8 }
-    }
-  }
-
   return null
 }
 
-// ── Main annotation drawing ───────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Text-only renderer: returns list of TextItems for each rendered line
+// ─────────────────────────────────────────────────────────────────────────────
 
-type AnnotationStyle = 'stamp' | 'circle' | 'underline' | 'strikethrough' | 'arrow-comment' | 'margin-note'
+function renderTextResume(ctx: CanvasRenderingContext2D, text: string, W: number): TextItem[] {
+  const items: TextItem[] = []
+  const margin = 68
+  const maxW = W - margin * 2
+  const baseFontSize = 13
+  const lineH = baseFontSize * 1.7
 
-function getAnnotationStyle(ann: RoastAnnotation, idx: number): AnnotationStyle {
-  if (ann.severity === 'fatal') return idx % 2 === 0 ? 'stamp' : 'circle'
-  if (ann.severity === 'error') return idx % 3 === 0 ? 'arrow-comment' : 'circle'
-  if (ann.severity === 'warning') return idx % 2 === 0 ? 'underline' : 'margin-note'
-  return 'margin-note'
-}
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, W, 10000)
 
-function getSeverityColor(severity: string): string {
-  switch (severity) {
-    case 'fatal':   return '#cc0000'
-    case 'error':   return '#d9500a'
-    case 'warning': return '#c98400'
-    default:        return '#1a3aaa'
+  let y = 65
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd()
+    if (!line.trim()) { y += lineH * 0.45; continue }
+
+    const isHeading = /^[A-Z][A-Z\s\-]+$/.test(line.trim()) && line.trim().length < 35
+    const isBullet = /^[•\-◦▪–]/.test(line.trim())
+    const isFirstLine = y < 100
+
+    const fontSize = isFirstLine ? 20 : isHeading ? 14 : baseFontSize
+    const weight = isHeading || isFirstLine ? 'bold' : 'normal'
+    ctx.font = `${weight} ${fontSize}px Georgia, serif`
+    ctx.fillStyle = '#111'
+
+    if (isHeading && y > 70) {
+      y += 4
+      ctx.strokeStyle = '#bbb'
+      ctx.lineWidth = 0.7
+      ctx.beginPath(); ctx.moveTo(margin, y + 3); ctx.lineTo(margin + maxW, y + 3); ctx.stroke()
+    }
+
+    // Word wrap
+    const words = line.split(' ')
+    let cur = ''
+    const wrapped: string[] = []
+    for (const w of words) {
+      const test = cur ? `${cur} ${w}` : w
+      if (ctx.measureText(test).width > maxW) { wrapped.push(cur); cur = w }
+      else cur = test
+    }
+    if (cur) wrapped.push(cur)
+
+    for (const wl of wrapped) {
+      ctx.fillStyle = '#111'
+      ctx.fillText(wl, isBullet ? margin + 12 : margin, y)
+      const mw = ctx.measureText(wl).width
+      items.push({ str: wl, x: isBullet ? margin + 12 : margin, y: y - fontSize, w: mw, h: fontSize + 4 })
+      y += lineH * (fontSize / baseFontSize)
+    }
+    if (isHeading) y += 3
   }
+
+  return items
 }
 
-// Short punchy callout versions of comments
-function shortCallout(comment: string, severity: string): string {
-  const punchy: Record<string, string[]> = {
-    fatal: ['REJECTED', 'NO.', 'DELETE THIS.', 'PROVE IT.', 'VAGUE.', 'WRONG.'],
-    error: ['WHERE ARE THE NUMBERS?', 'THIS TELLS ME NOTHING.', 'HOW MANY USERS?', 'WHAT IMPACT?', 'WHICH TECH?'],
-    warning: ['BUZZWORD SOUP.', 'TOO VAGUE.', 'NO METRICS.', 'SHOW DON\'T TELL.'],
-    note: ['?', 'Elaborate.', 'So what?', 'Specifics?'],
+// ─────────────────────────────────────────────────────────────────────────────
+// Placement engine
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AnnotationJob {
+  text: string
+  level: 1 | 2 | 3 | 4
+  targetText?: string
+  markType?: V4LineRoast['markType']
+}
+
+interface PlacedResult {
+  marks: PlacedMark[]
+  comments: PlacedComment[]
+}
+
+const RED = '#cc0000'
+const DARK_RED = '#a30000'
+const ORANGE_RED = '#d94000'
+
+function levelColor(level: number): string {
+  if (level === 1) return RED
+  if (level === 2) return DARK_RED
+  if (level === 3) return '#b30000'
+  return ORANGE_RED
+}
+
+function levelFontSize(level: number): number {
+  if (level === 1) return 52
+  if (level === 2) return 32
+  if (level === 3) return 18
+  return 13
+}
+
+function levelAlpha(level: number): number {
+  if (level === 1) return 0.72
+  if (level === 2) return 0.88
+  if (level === 3) return 0.92
+  return 0.85
+}
+
+/**
+ * Given a list of annotation jobs and available text items,
+ * returns placed marks + comment positions.
+ * Comments alternate left/right margin with arrow back to text.
+ */
+function placeAnnotations(
+  jobs: AnnotationJob[],
+  items: TextItem[],
+  canvasW: number,
+  canvasH: number,
+): PlacedResult {
+  const marks: PlacedMark[] = []
+  const comments: PlacedComment[] = []
+
+  // Track vertical cursors per column to avoid overlap
+  const leftCursor = { y: 80 }
+  const rightCursor = { y: 80 }
+  const marginW = 62  // width of each margin column
+
+  // Stamps are placed in a grid across the page
+  let stampIndex = 0
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i]
+    const r = rng(i * 997 + 13)
+    const color = levelColor(job.level)
+    const fontSize = levelFontSize(job.level)
+    const alpha = levelAlpha(job.level)
+
+    if (job.level === 1) {
+      // ── Giant stamp: placed at fixed positions across the page ──────────────
+      const stampPositions = [
+        { x: canvasW * 0.72, y: canvasH * 0.12 },
+        { x: canvasW * 0.22, y: canvasH * 0.55 },
+        { x: canvasW * 0.65, y: canvasH * 0.78 },
+      ]
+      const pos = stampPositions[stampIndex % stampPositions.length]
+      stampIndex++
+      const rotation = (r() - 0.5) * 28 - 12  // -26 to +2 degrees
+      comments.push({
+        text: job.text, x: pos.x, y: pos.y,
+        rotation, fontSize, color, alpha,
+      })
+      continue
+    }
+
+    // ── Find where the target text lives ─────────────────────────────────────
+    const found = job.targetText ? findText(items, job.targetText) : null
+
+    if (found) {
+      // Draw a mark on the text itself
+      if (job.markType) {
+        marks.push({
+          textX: found.x, textY: found.y,
+          textW: found.w, textH: found.h,
+          markType: job.markType,
+        })
+      }
+
+      // Choose which margin (alternate, pick whichever is lower)
+      const useLeft = leftCursor.y <= rightCursor.y
+      const commentX = useLeft
+        ? marginW - fontSize * 0.4
+        : canvasW - marginW + 4
+
+      // Place comment at the text's y-level but respect the cursor
+      const targetY = found.y + found.h / 2
+      const minY = useLeft ? leftCursor.y : rightCursor.y
+      const commentY = Math.max(targetY, minY + (job.level === 2 ? 50 : 28))
+
+      if (useLeft) leftCursor.y = commentY + fontSize + 8
+      else rightCursor.y = commentY + fontSize + 8
+
+      const rotation = (r() - 0.5) * (job.level === 2 ? 18 : 12)
+      const arrowFromX = useLeft ? commentX + fontSize * 0.5 : commentX
+      const arrowToX = found.x + (useLeft ? 0 : found.w)
+
+      comments.push({
+        text: job.text,
+        x: commentX, y: commentY,
+        rotation, fontSize, color, alpha,
+        arrowToX: arrowToX + (useLeft ? -3 : 3),
+        arrowToY: found.y + found.h / 2 + (r() - 0.5) * 4,
+      })
+    } else {
+      // No text found — scatter in available margin space
+      const useLeft = leftCursor.y <= rightCursor.y
+      const commentX = useLeft ? 8 : canvasW - marginW
+      const commentY = useLeft ? leftCursor.y + 15 : rightCursor.y + 15
+
+      if (useLeft) leftCursor.y = commentY + fontSize + (job.level < 3 ? 44 : 22)
+      else rightCursor.y = commentY + fontSize + (job.level < 3 ? 44 : 22)
+
+      const rotation = (r() - 0.5) * 15
+
+      // Place scattered inside the text area too if margins are full
+      const overflow = Math.max(leftCursor.y, rightCursor.y) > canvasH * 0.85
+      const scatterX = overflow ? 90 + r() * (canvasW - 200) : commentX
+      const scatterY = overflow
+        ? 120 + r() * (canvasH * 0.7)
+        : commentY
+
+      comments.push({
+        text: job.text, x: scatterX, y: scatterY,
+        rotation, fontSize, color, alpha,
+      })
+    }
   }
 
-  // Try to extract key phrase from the actual comment
-  const lower = comment.toLowerCase()
-  if (lower.includes('metric') || lower.includes('number')) return 'WHERE ARE THE NUMBERS?'
-  if (lower.includes('vague') || lower.includes('nothing')) return 'THIS TELLS ME NOTHING.'
-  if (lower.includes('buzzword') || lower.includes('generic')) return 'BUZZWORD SOUP.'
-  if (lower.includes('crud') || lower.includes('tutorial')) return 'ANOTHER CRUD APP.'
-  if (lower.includes('prove') || lower.includes('evidence')) return 'PROVE IT.'
-  if (lower.includes('impact') || lower.includes('achieve')) return 'WHAT IMPACT?'
-  if (lower.includes('passionate') || lower.includes('hardworking')) return 'EVERYONE SAYS THIS.'
-  if (lower.includes('skill') || lower.includes('dump') || lower.includes('list')) return 'MASTER OF NONE?'
-  if (lower.includes('lead') || lower.includes('senior')) return 'PROVE THE LEADERSHIP.'
-  if (lower.includes('api')) return 'WHICH API? REST? GRAPHQL?'
-  if (lower.includes('user') || lower.includes('scale')) return 'FOR HOW MANY USERS?'
-
-  // Fallback to first 30 chars of comment, uppercased for fatal/error
-  const truncated = comment.slice(0, 28).replace(/['"]/g, '')
-  return severity === 'fatal' || severity === 'error' ? truncated.toUpperCase() + '.' : truncated + '.'
+  return { marks, comments }
 }
 
-function drawAnnotations(
+// ─────────────────────────────────────────────────────────────────────────────
+// Draw everything onto the canvas
+// ─────────────────────────────────────────────────────────────────────────────
+
+function drawAll(
   ctx: CanvasRenderingContext2D,
-  annotations: RoastAnnotation[],
-  positions: Array<{ x: number; y: number; w: number; h: number } | null>,
-  canvasWidth: number,
-  canvasHeight: number,
-  roastScore: number | undefined,
-  overallVerdict: string | undefined,
-  font: string
+  marks: PlacedMark[],
+  comments: PlacedComment[],
+  font: string,
 ) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
-  annotations.forEach((ann, idx) => {
-    const rng = makeRng(idx * 999 + 7)
-    const pos = positions[idx]
-    const color = getSeverityColor(ann.severity)
-    const style = getAnnotationStyle(ann, idx)
-    const callout = shortCallout(ann.comment, ann.severity)
-
-    ctx.strokeStyle = color
-    ctx.fillStyle = color
-
-    if (!pos) {
-      // Place in margin/random
-      const cx = 40 + rng() * 60
-      const cy = 100 + (idx / annotations.length) * (canvasHeight - 200)
-      drawHandwrittenText(ctx, callout.slice(0, 20), cx, cy, 12, (rng() - 0.5) * 20, color, font)
-      return
-    }
-
-    const { x, y, w, h } = pos
-
-    if (style === 'stamp') {
-      // Big diagonal stamp
-      const size = ann.severity === 'fatal' ? 36 : 28
-      const rot = (rng() - 0.5) * 24 - 10
-      ctx.lineWidth = 3.5
-      drawStamp(ctx, callout, x + w / 2, y + h / 2, rot, size, color, font)
-
-    } else if (style === 'circle') {
-      // Circle around the text + side note
-      ctx.lineWidth = 2.5
-      const rx = w / 2 + 8 + rng() * 4
-      const ry = h / 2 + 8 + rng() * 3
-      roughCircle(ctx, x + w / 2, y + h / 2, rx, ry, rng)
-
-      // Arrow to comment in margin/nearby
-      const commentX = rng() > 0.5
-        ? x + w + 20 + rng() * 60
-        : x - 20 - rng() * 80
-      const commentY = y - 10 + (rng() - 0.5) * 30
-      ctx.lineWidth = 1.8
-      drawArrow(ctx, x + w / 2, y - ry + 4, commentX, commentY, rng)
-      const rot = (rng() - 0.5) * 18
-      drawHandwrittenText(ctx, callout, commentX, commentY, ann.severity === 'error' ? 15 : 13, rot, color, font)
-
-    } else if (style === 'underline') {
-      // Wavy underline
-      ctx.lineWidth = 2.5
-      drawWavedUnderline(ctx, x, y + h + 3, w, rng)
-      // Small margin note
-      const noteX = x + w + 10 + rng() * 20
-      const noteY = y + h / 2
-      const rot = (rng() - 0.5) * 15
-      drawHandwrittenText(ctx, callout.slice(0, 22), noteX, noteY, 12, rot, color, font)
-
-    } else if (style === 'strikethrough') {
-      // Strike through + note above
-      ctx.lineWidth = 2.5
-      drawStrikethrough(ctx, x, y + h / 2, w, rng)
-      const rot = (rng() - 0.5) * 16
-      drawHandwrittenText(ctx, callout, x, y - 6, 13, rot, color, font)
-
-    } else if (style === 'arrow-comment') {
-      // Arrow from side pointing to text + big comment
-      const fromX = rng() > 0.5 ? x + w + 30 + rng() * 80 : x - 30 - rng() * 80
-      const fromY = y + h / 2 + (rng() - 0.5) * 20
-      ctx.lineWidth = 2.2
-      drawArrow(ctx, fromX, fromY, x + rng() * w, y + h / 2, rng)
-      const rot = (rng() - 0.5) * 22
-      const fsize = ann.severity === 'error' ? 16 : 14
-      drawHandwrittenText(ctx, callout, fromX, fromY - 5, fsize, rot, color, font)
-
-    } else {
-      // margin-note: small note with short line
-      const noteX = x + w + 8
-      const noteY = y + h / 2 + (rng() - 0.5) * 10
-      ctx.lineWidth = 1.5
-      roughLine(ctx, x + w, y + h / 2, noteX - 4, noteY, rng)
-      const rot = (rng() - 0.5) * 14
-      drawHandwrittenText(ctx, callout.slice(0, 25), noteX, noteY + 4, 12, rot, color, font)
-    }
-  })
-
-  // Draw overall roast score if available
-  if (roastScore != null) {
-    const scoreColor = roastScore >= 8 ? '#16a34a' : roastScore >= 5 ? '#d97706' : '#cc0000'
-    ctx.save()
-    ctx.translate(canvasWidth - 100, 60)
-    ctx.rotate(-0.2)
-    ctx.font = `900 42px "${font}", cursive`
-    ctx.fillStyle = scoreColor
+  // ── Draw text marks first (underlines, circles, strikethroughs) ─────────────
+  ctx.strokeStyle = RED
+  for (let i = 0; i < marks.length; i++) {
+    const m = marks[i]
+    const r = rng(i * 333 + 1)
+    ctx.strokeStyle = levelColor(3)
+    ctx.lineWidth = 2.2
     ctx.globalAlpha = 0.9
-    ctx.fillText(`${roastScore.toFixed(1)}/10`, 0, 0)
-    ctx.font = `bold 14px "${font}", cursive`
-    ctx.fillText('ROAST SCORE', 0, 20)
-    ctx.restore()
+
+    const { textX: x, textY: y, textW: w, textH: h } = m
+    const cy = y + h / 2
+    const by = y + h + 3
+
+    switch (m.markType) {
+      case 'circle':
+        ctx.lineWidth = 2.5
+        wobbleCircle(ctx, x + w / 2, cy, w / 2 + 8, h / 2 + 7, r)
+        break
+      case 'underline':
+        waveUnderline(ctx, x - 2, by, w + 4, r)
+        break
+      case 'strikethrough':
+        jitter(ctx, x - 2, cy, x + w + 2, cy + (r() * 3 - 1.5), r)
+        break
+      case 'box':
+        ctx.lineWidth = 2
+        roughBox(ctx, x - 4, y - 2, w + 8, h + 6, r)
+        break
+    }
+    ctx.globalAlpha = 1
   }
 
-  // Overall verdict banner at bottom
-  if (overallVerdict) {
-    ctx.save()
-    ctx.font = `bold 16px "${font}", cursive`
-    ctx.fillStyle = '#cc0000'
-    ctx.globalAlpha = 0.85
-    ctx.translate(60, canvasHeight - 30)
-    ctx.rotate(-0.015)
-    ctx.fillText(`📝 ${overallVerdict.slice(0, 80)}`, 0, 0)
-    ctx.restore()
+  // ── Draw arrows from comments to text ────────────────────────────────────────
+  for (let i = 0; i < comments.length; i++) {
+    const c = comments[i]
+    if (c.arrowToX == null || c.arrowToY == null) continue
+    const r = rng(i * 441 + 7)
+    ctx.strokeStyle = c.color
+    ctx.lineWidth = 1.6
+    ctx.globalAlpha = c.alpha * 0.75
+    curvedArrow(ctx, c.x, c.y, c.arrowToX, c.arrowToY, r)
+    ctx.globalAlpha = 1
+  }
+
+  // ── Draw comment text ────────────────────────────────────────────────────────
+  for (let i = 0; i < comments.length; i++) {
+    const c = comments[i]
+    const isStamp = c.fontSize >= 45
+
+    if (isStamp) {
+      // Stamps get the hollow border treatment
+      stampText(ctx, c.text, c.x, c.y, c.rotation, c.fontSize, c.color, c.alpha, font)
+    } else {
+      // Regular handwritten text, possibly multi-line
+      const lines = wrapText(ctx, c.text, c.fontSize, font, c.fontSize <= 16 ? 130 : 200)
+      ctx.save()
+      ctx.translate(c.x, c.y)
+      ctx.rotate((c.rotation * Math.PI) / 180)
+      ctx.globalAlpha = c.alpha
+      ctx.fillStyle = c.color
+      ctx.font = `bold ${c.fontSize}px "${font}", cursive`
+      for (let li = 0; li < lines.length; li++) {
+        ctx.fillText(lines[li], 0, li * (c.fontSize + 3))
+      }
+      ctx.restore()
+    }
   }
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+function wrapText(ctx: CanvasRenderingContext2D, text: string, fontSize: number, font: string, maxW: number): string[] {
+  ctx.font = `bold ${fontSize}px "${font}", cursive`
+  if (ctx.measureText(text).width <= maxW) return [text]
+  const words = text.split(' ')
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w
+    if (ctx.measureText(test).width > maxW) { lines.push(cur); cur = w }
+    else cur = test
+  }
+  if (cur) lines.push(cur)
+  return lines.length ? lines : [text]
+}
 
-export function RoastCanvas({
-  resumeText, pdfFileUrl, annotations,
-  roastScore, overallVerdict,
-}: RoastCanvasProps) {
-  const [dataUrl, setDataUrl] = useState<string>('')
+// ─────────────────────────────────────────────────────────────────────────────
+// Build job list from RoastV4 data
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildJobs(data: RoastV4, canvasH: number): AnnotationJob[] {
+  const jobs: AnnotationJob[] = []
+
+  // Level 1 — stamps
+  for (const mc of data.majorCallouts || []) {
+    jobs.push({ text: mc.text, level: 1 })
+  }
+
+  // Level 2 — section callouts
+  for (const sr of data.sectionRoasts || []) {
+    jobs.push({ text: sr.callout, level: sr.level as 2 | 3, targetText: sr.section })
+  }
+
+  // Level 2/3/4 — line roasts (the bulk)
+  for (const lr of data.lineRoasts || []) {
+    jobs.push({
+      text: lr.comment,
+      level: lr.level as 2 | 3 | 4,
+      targetText: lr.targetText,
+      markType: lr.markType,
+    })
+  }
+
+  // ATS roasts as level 4 teacher notes — scattered
+  for (const ar of data.atsRoasts || []) {
+    jobs.push({
+      text: `Missing: "${ar.keyword}"`,
+      level: 4,
+    })
+  }
+
+  // Pad to minimum 25 with recruiter concerns as level 4 notes
+  const recruiterConcerns = data.recruiterConcerns || []
+  for (let i = 0; jobs.length < 25 && i < recruiterConcerns.length * 3; i++) {
+    const concern = recruiterConcerns[i % recruiterConcerns.length]
+    jobs.push({ text: concern.slice(0, 40), level: 4 })
+  }
+
+  // Pad to minimum 25 with interview question flags
+  const qs = data.interviewQuestions || []
+  for (let i = 0; jobs.length < 25 && i < qs.length; i++) {
+    jobs.push({ text: `Q: ${qs[i].slice(0, 35)}?`, level: 4 })
+  }
+
+  void canvasH
+  return jobs
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface RoastCanvasProps {
+  resumeText: string
+  pdfFileUrl?: string
+  roastData: RoastV4
+}
+
+export function RoastCanvas({ resumeText, pdfFileUrl, roastData }: RoastCanvasProps) {
+  const [dataUrl, setDataUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const canvasRef = useRef<HTMLImageElement>(null)
-
   const font = 'Caveat'
 
   const render = useCallback(async () => {
+    if (!roastData?.lineRoasts?.length) return
     setLoading(true)
     setError('')
-    try {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('Canvas not supported')
 
-      let positions: Array<{ x: number; y: number; w: number; h: number } | null> = []
+    try {
+      // Wait for Caveat font to be loaded
+      await document.fonts.ready
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')!
+
+      let items: TextItem[] = []
 
       if (pdfFileUrl) {
-        // ── PDF path ──────────────────────────────────────────────────────────
+        // ── PDF path ────────────────────────────────────────────────────────
         const pdfjsLib = await import('pdfjs-dist')
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
         const resp = await fetch(pdfFileUrl)
-        const arrayBuffer = await resp.arrayBuffer()
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        const buf = await resp.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise
         const page = await pdf.getPage(1)
         const scale = 2.2
-        const viewport = page.getViewport({ scale })
+        const vp = page.getViewport({ scale })
+        canvas.width = vp.width
+        canvas.height = vp.height
 
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-
-        // Render PDF page (pdfjs v5 requires `canvas` prop)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await page.render({ canvas: canvas as any, canvasContext: ctx, viewport } as any).promise
+        await page.render({ canvas: canvas as any, canvasContext: ctx, viewport: vp } as any).promise
 
-        // Get text positions
-        const textContent = await page.getTextContent()
-        const items = textContent.items as PdfTextItem[]
-
-        positions = annotations.map((ann, idx) => {
-          const rng = makeRng(idx * 31)
-          return findAnchorInPdfItems(items, ann.targetText, viewport, scale, rng)
-        })
-
+        // Extract text item positions
+        const tc = await page.getTextContent()
+        for (const raw of tc.items as Array<{ str: string; transform: number[]; width: number; height: number }>) {
+          if (!raw.str?.trim()) continue
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const [vx, vy] = (vp as any).convertToViewportPoint(raw.transform[4], raw.transform[5])
+          items.push({
+            str: raw.str,
+            x: vx,
+            y: vy - raw.height * scale - 2,
+            w: raw.width * scale,
+            h: raw.height * scale + 4,
+          })
+        }
       } else {
-        // ── Text-only path ────────────────────────────────────────────────────
+        // ── Text-only path ──────────────────────────────────────────────────
         canvas.width = 720
-        canvas.height = 1080
+        canvas.height = 10000  // will trim
 
-        // Draw white background
-        ctx.fillStyle = '#fff'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        items = renderTextResume(ctx, resumeText, canvas.width)
 
-        // Render resume text and collect block positions
-        const blocks = renderResumeText(ctx, resumeText, canvas.width)
-
-        // Resize canvas height to content
-        const maxY = blocks.reduce((m, b) => Math.max(m, b.y + b.h), 0) + 80
-        const finalH = Math.max(1080, maxY + 60)
+        // Trim canvas height
+        const maxY = items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
+        const finalH = Math.max(900, maxY + 80)
         const imgData = ctx.getImageData(0, 0, canvas.width, finalH)
         canvas.height = finalH
         ctx.putImageData(imgData, 0, 0)
-        // Re-draw white bg for newly revealed area
         ctx.fillStyle = '#fff'
-        ctx.fillRect(0, maxY, canvas.width, finalH - maxY)
-
-        positions = annotations.map((ann, idx) => {
-          const rng = makeRng(idx * 17)
-          return findTextPosition(blocks, ann.targetText, canvas.width, canvas.height, rng)
-        })
+        ctx.fillRect(0, maxY + 4, canvas.width, finalH)
       }
 
-      // ── Draw all annotations on canvas ────────────────────────────────────
-      drawAnnotations(
-        ctx, annotations, positions,
-        canvas.width, canvas.height,
-        roastScore, overallVerdict, font
-      )
+      // ── Build + place annotations ──────────────────────────────────────────
+      const jobs = buildJobs(roastData, canvas.height)
+      const { marks, comments } = placeAnnotations(jobs, items, canvas.width, canvas.height)
 
-      setDataUrl(canvas.toDataURL('image/png', 0.92))
+      // ── Draw everything ────────────────────────────────────────────────────
+      drawAll(ctx, marks, comments, font)
+
+      setDataUrl(canvas.toDataURL('image/png', 0.93))
     } catch (e) {
-      console.error('Roast canvas error:', e)
-      setError('Could not render annotated resume. Try again.')
+      console.error('RoastCanvas error:', e)
+      setError('Could not render — try again.')
     } finally {
       setLoading(false)
     }
-  }, [pdfFileUrl, resumeText, annotations, roastScore, overallVerdict, font])
+  }, [pdfFileUrl, resumeText, roastData, font])
 
   useEffect(() => {
-    if (annotations.length > 0) render()
-  }, [render, annotations])
+    render()
+  }, [render])
 
-  const downloadPNG = () => {
-    if (!dataUrl) return
+  const download = () => {
     const a = document.createElement('a')
     a.href = dataUrl
     a.download = 'resume-roasted.png'
     a.click()
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
-        <p className="text-xs text-[var(--text-muted)]">Drawing red pen marks…</p>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-muted)]">
+      <Loader2 className="w-5 h-5 animate-spin" />
+      <p className="text-xs">Sharpening the red pen…</p>
+    </div>
+  )
 
-  if (error) {
-    return (
-      <div className="text-center py-10">
-        <p className="text-xs text-red-400 mb-3">{error}</p>
-        <Button size="sm" variant="outline" onClick={render}>
-          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Try again
-        </Button>
-      </div>
-    )
-  }
+  if (error) return (
+    <div className="text-center py-10">
+      <p className="text-xs text-red-400 mb-3">{error}</p>
+      <Button size="sm" variant="outline" onClick={render}>
+        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Retry
+      </Button>
+    </div>
+  )
 
   if (!dataUrl) return null
 
@@ -624,30 +679,21 @@ export function RoastCanvas({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-[var(--text-faint)]">
-          {pdfFileUrl
-            ? 'Your PDF — annotated by a recruiter with a red pen'
-            : 'Resume rendered and annotated — upload a PDF for better fidelity'}
+          {pdfFileUrl ? 'Your PDF — destroyed with a red Sharpie' : 'Resume text — annotated (upload PDF for better fidelity)'}
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={downloadPNG}>
-            <Download className="w-3.5 h-3.5 mr-1.5" />Download PNG
+          <Button size="sm" variant="outline" onClick={download}>
+            <Download className="w-3.5 h-3.5 mr-1.5" />Save PNG
           </Button>
-          <Button size="sm" variant="outline" onClick={render}>
+          <Button size="sm" variant="outline" onClick={render} title="Re-render">
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
 
-      {/* The annotated image */}
-      <div className="rounded-lg overflow-hidden border border-[var(--border)] shadow-2xl bg-white">
+      <div className="rounded-lg overflow-hidden border border-[var(--border)] shadow-2xl">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={canvasRef}
-          src={dataUrl}
-          alt="Annotated resume"
-          className="w-full"
-          style={{ display: 'block' }}
-        />
+        <img src={dataUrl} alt="Annotated resume" className="w-full block" />
       </div>
     </div>
   )

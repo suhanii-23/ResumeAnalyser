@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { SYSTEM_PROMPT, ANALYZE_PROMPT, ROAST_PROMPT, RECRUITER_PROMPT, INTERVIEW_PREP_PROMPT } from '@/lib/prompts'
+import { SYSTEM_PROMPT, ANALYZE_PROMPT, ROAST_PROMPT_V4, RECRUITER_PROMPT, INTERVIEW_PREP_PROMPT } from '@/lib/prompts'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -18,20 +18,13 @@ export async function POST(req: NextRequest) {
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: ROAST_PROMPT(resumeText, jdText || '') },
+          { role: 'user', content: ROAST_PROMPT_V4(resumeText, jdText || '') },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.8,
-        max_tokens: 4000,
+        temperature: 0.85,
+        max_tokens: 6000,
       })
       const result = JSON.parse(response.choices[0].message.content || '{}')
-      // Normalise anchorText → targetText for backwards compat
-      if (result.annotations) {
-        result.annotations = result.annotations.map((a: Record<string, string>) => ({
-          ...a,
-          targetText: a.anchorText || a.targetText || '',
-        }))
-      }
       return NextResponse.json({ result })
     }
 
