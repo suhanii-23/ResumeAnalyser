@@ -87,6 +87,39 @@ export interface RoastResult {
   verdict: RoastVerdict
 }
 
+// ── Pure Roast — entertainment first, no advice ───────────────────────────────
+
+export interface RoastExperienceEntry2 {
+  company: string
+  role: string
+  jokes: string[]         // one roast line per notable bullet
+}
+
+export interface RoastProjectEntry2 {
+  projectName: string
+  roast: string
+  projectFlag?: string    // e.g. "CRUD App", "AI buzzword", "clone"
+}
+
+export interface RoastAward {
+  emoji: string
+  name: string
+  reason: string
+}
+
+export interface PureRoast {
+  openingShot: string
+  summaryRoast: string[]
+  experienceRoast: RoastExperienceEntry2[]
+  projectRoast: RoastProjectEntry2[]
+  skillsRoast: string[]
+  educationRoast: string[]
+  certificationRoast: string[]
+  recruiterInnerThoughts: string[]
+  awardCategories: RoastAward[]
+  finalVerdict: string
+}
+
 // ── Roast V6 — section-by-section text roast ─────────────────────────────────
 
 export interface RoastPhrase {

@@ -41,10 +41,10 @@ type Panel = typeof NAV_ITEMS[number]['id']
 export function ResultsView({ onReset }: ResultsViewProps) {
   const {
     analysisResult, currentSchema,
-    roastV6, recruiterEvaluation, interviewPrep,
+    pureRoast, recruiterEvaluation, interviewPrep,
     resumeText, jdText, activePanel,
     currentResumeText, resumeTextVersions,
-    setActivePanel, setRoastV6, setRecruiterEvaluation,
+    setActivePanel, setPureRoast, setRecruiterEvaluation,
     setInterviewPrep, setChatMode,
   } = useResumeStore()
 
@@ -69,8 +69,8 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         }),
       })
       const data = await res.json()
-      if (data.result?.overallVerdict || data.result?.firstImpression) {
-        setRoastV6(data.result)
+      if (data.result?.openingShot || data.result?.finalVerdict) {
+        setPureRoast(data.result)
         setActivePanel('roast')
       }
     } finally {
@@ -256,18 +256,15 @@ export function ResultsView({ onReset }: ResultsViewProps) {
         {/* Roast */}
         {panel === 'roast' && (
           <div className="flex-1 overflow-y-auto">
-            {!roastV6 ? (
+            {!pureRoast ? (
 
               /* ── Empty state ──────────────────────────────────────────── */
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
                 <div className="text-6xl mb-5">🔥</div>
-                <p className="text-base font-semibold text-[var(--text)] mb-2">Resume Roast</p>
-                <p className="text-xs text-[var(--text-muted)] max-w-sm mb-2 leading-relaxed">
-                  A senior recruiter, a hiring manager, a strict professor, and a sarcastic
-                  tech lead reviewed your resume together.
-                </p>
-                <p className="text-xs text-[var(--text-faint)] max-w-xs mb-8 leading-relaxed">
-                  Section-by-section. Bullet by bullet. Funny, specific, and actionable.
+                <p className="text-base font-semibold text-[var(--text)] mb-3">Resume Roast</p>
+                <p className="text-xs text-[var(--text-muted)] max-w-xs mb-8 leading-relaxed">
+                  Not feedback. Not advice. Not a career coach.
+                  <br />Just a roast.
                 </p>
                 <Button onClick={runRoast} disabled={!!loadingPanel} size="lg">
                   {loadingPanel === 'roast'
@@ -279,13 +276,10 @@ export function ResultsView({ onReset }: ResultsViewProps) {
 
             ) : (
 
-              /* ── Report ───────────────────────────────────────────────── */
+              /* ── Roast report ─────────────────────────────────────────── */
               <div className="px-5 py-5">
                 <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
-                    <p className="text-[11px] text-[var(--text-muted)]">9 sections · section-by-section analysis</p>
-                  </div>
+                  <h1 className="text-sm font-semibold text-[var(--text)]">Resume Roast</h1>
                   <Button size="sm" variant="outline" onClick={runRoast} disabled={!!loadingPanel}>
                     {loadingPanel === 'roast'
                       ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Re-roasting…</>
@@ -293,7 +287,7 @@ export function ResultsView({ onReset }: ResultsViewProps) {
                     }
                   </Button>
                 </div>
-                <RoastReport data={roastV6} />
+                <RoastReport data={pureRoast} />
               </div>
             )}
           </div>
